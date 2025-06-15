@@ -568,53 +568,6 @@ export const fetchCompanyProfile = async (symbol) => {
   }
 };
 
-// ===== REAL-TIME QUOTE =====
-export const fetchStockQuote = async (symbol) => {
-  try {
-    validateApiKey(symbol);
-    
-    const response = await alphaVantageApi.get('', {
-      params: addApiKey({
-        function: 'GLOBAL_QUOTE',
-        symbol: symbol.toUpperCase()
-      })
-    });
-
-    const data = response.data;
-    
-    if (data['Error Message']) {
-      throw new Error(`Invalid symbol: ${symbol}`);
-    }
-    
-    if (isRateLimited(data)) {
-      throw new Error(getRateLimitMessage(data));
-    }
-
-    const quote = data['Global Quote'];
-    if (!quote || !quote['01. symbol']) {
-      throw new Error(`No quote data found for symbol: ${symbol}`);
-    }
-
-    return {
-      symbol: quote['01. symbol'],
-      price: parseFloat(quote['05. price']),
-      change: parseFloat(quote['09. change']),
-      changePercent: parseFloat(quote['10. change percent'].replace('%', '')),
-      volume: parseInt(quote['06. volume']),
-      latestTradingDay: quote['07. latest trading day'],
-      previousClose: parseFloat(quote['08. previous close']),
-      open: parseFloat(quote['02. open']),
-      high: parseFloat(quote['03. high']),
-      low: parseFloat(quote['04. low'])
-    };
-  } catch (error) {
-    if (error.response?.status === 429) {
-      throw new Error('API rate limit exceeded. Please try again tomorrow.');
-    }
-    throw new Error(`Failed to fetch stock quote: ${error.message}`);
-  }
-};
-
 // ===== EARNINGS DATA =====
 export const fetchEarningsData = async (symbol) => {
   try {
@@ -787,7 +740,6 @@ export const fetchAllFinancialData = async (symbol, period = 'quarterly') => {
     // Fetch all data with proper error handling
     const [
       profile,
-      quote,
       historicalData,
       incomeStatement,
       cashFlowStatement,
@@ -796,7 +748,6 @@ export const fetchAllFinancialData = async (symbol, period = 'quarterly') => {
       dividendsData
     ] = await Promise.allSettled([
       fetchCompanyProfile(symbol),
-      fetchStockQuote(symbol),
       fetchHistoricalData(symbol),
       fetchIncomeStatement(symbol),
       fetchCashFlowStatement(symbol),
@@ -808,7 +759,6 @@ export const fetchAllFinancialData = async (symbol, period = 'quarterly') => {
     const result = {
       symbol: symbol.toUpperCase(),
       profile: profile.status === 'fulfilled' ? profile.value : null,
-      quote: quote.status === 'fulfilled' ? quote.value : null,
       originalHistoricalData: historicalData.status === 'fulfilled' ? historicalData.value : [],
       historicalData: historicalData.status === 'fulfilled' ? filterHistoricalData(historicalData.value, period) : [],
       incomeStatement: incomeStatement.status === 'fulfilled' ? incomeStatement.value : { annual: [], quarterly: [] },
@@ -822,7 +772,6 @@ export const fetchAllFinancialData = async (symbol, period = 'quarterly') => {
     // Collect any errors
     const requests = [
       { name: 'Profile', result: profile },
-      { name: 'Quote', result: quote },
       { name: 'Historical Data', result: historicalData },
       { name: 'Income Statement', result: incomeStatement },
       { name: 'Cash Flow', result: cashFlowStatement },
@@ -838,7 +787,7 @@ export const fetchAllFinancialData = async (symbol, period = 'quarterly') => {
     });
 
     // If all critical requests failed, throw an error
-    if (!result.profile && !result.quote && result.historicalData.length === 0) {
+    if (!result.profile && result.historicalData.length === 0) {
       throw new Error(`Failed to fetch basic data for ${symbol}: ${result.errors.join(', ')}`);
     }
 
@@ -927,7 +876,6 @@ export const getCacheInfo = () => {
 
 export default {
   fetchCompanyProfile,
-  fetchStockQuote,
   fetchHistoricalData,
   fetchIncomeStatement,
   fetchCashFlowStatement,

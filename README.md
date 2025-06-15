@@ -30,22 +30,29 @@ A modern React application for comprehensive stock research and financial analys
 
 ## 📊 Alpha Vantage API Integration
 
-### Endpoints Used
-1. **TIME_SERIES_WEEKLY_ADJUSTED** - Historical price data (weekly data points for free tier compatibility)
-2. **INCOME_STATEMENT** - Revenue, EBITDA, Net Income
-3. **CASH_FLOW** - Free cash flow analysis
-4. **BALANCE_SHEET** - Cash, debt, shares outstanding
-5. **EARNINGS** - EPS data with estimates and surprises
-6. **DIVIDENDS** - Dividend payment history
-7. **OVERVIEW** - Company profile and financial ratios
-8. **GLOBAL_QUOTE** - Real-time stock quotes
+The application uses the following Alpha Vantage API endpoints:
 
-### Free Tier Optimization
-- **25 API calls/day limit** managed through intelligent caching
-- **8 endpoints per stock** = ~3 stocks per day maximum
-- **Persistent cache** allows unlimited viewing of cached stocks
-- **Smart error handling** for rate limit scenarios
-- **Weekly price data** - Uses TIME_SERIES_WEEKLY_ADJUSTED for free tier compatibility
+1. **OVERVIEW** - Company profile and basic information
+2. **TIME_SERIES_DAILY** - Historical daily price data
+3. **INCOME_STATEMENT** - Income statement data
+4. **CASH_FLOW** - Cash flow statement data
+5. **BALANCE_SHEET** - Balance sheet data
+6. **EARNINGS** - Earnings per share data
+7. **DIVIDENDS** - Dividend history
+
+### API Call Management
+
+- Each stock search makes 7 API calls in parallel
+- Results are cached in localStorage for 24 hours
+- Cache can be cleared using the "Clear Cache" button
+- Free tier limit: 25 API calls per day
+
+### API Key Management
+
+- API key can be set in the Settings modal
+- Key is stored in localStorage for persistence
+- Demo key is used for IBM if no key is set
+- Key can be cleared using the "Clear API Key" button
 
 ## 🛠 Technology Stack
 
@@ -118,7 +125,6 @@ src/
 │   ├── CashDebtChart.jsx      # Cash vs debt comparison
 │   ├── SharesOutstandingChart.jsx # Shares outstanding analysis
 │   ├── CompanyProfile.jsx     # Company information display
-│   ├── StockQuote.jsx         # Real-time stock quote
 │   ├── StockSearch.jsx        # Search functionality
 │   └── ErrorMessage.jsx       # Error handling component
 ├── utils/

@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Search, Loader2, TrendingUp, Building2, DollarSign, Settings } from 'lucide-react';
+import { Search, Loader2, TrendingUp, Building2, DollarSign, Settings, Users, Globe } from 'lucide-react';
 
 // Import chart components
 import PriceChart from './components/PriceChart';
@@ -22,6 +20,16 @@ import SettingsModal from './components/SettingsModal';
 // Import Alpha Vantage API functions
 import { fetchAllFinancialData, clearCache, filterHistoricalData, initializeApiKey, updateApiKey } from './utils/fetchAlphaVantage';
 import './App.css';
+
+// Format market cap to B/M/K format
+const formatMarketCap = (value) => {
+  if (!value) return 'N/A';
+  if (value >= 1e12) return `$${(value / 1e12).toFixed(1)}T`;
+  if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
+  if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
+  if (value >= 1e3) return `$${(value / 1e3).toFixed(1)}K`;
+  return `$${value.toFixed(0)}`;
+};
 
 function App() {
   const [financialData, setFinancialData] = useState(null);
@@ -134,7 +142,7 @@ function App() {
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
               <span className="text-yellow-800">
-                <strong>Free Tier:</strong> 25 API calls/day • 8 calls per stock • ~3 stocks per day max
+                <strong>Free Tier:</strong> 25 API calls/day • 7 calls per stock • ~3 stocks per day max
               </span>
             </div>
             <div className="text-yellow-700">
@@ -183,14 +191,14 @@ function App() {
             <Button
               variant={timeframe === 'quarter' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setTimeframe('quarter')}
+              onClick={() => handleTimeframeChange('quarter')}
             >
               Quarterly
             </Button>
             <Button
               variant={timeframe === 'annual' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setTimeframe('annual')}
+              onClick={() => handleTimeframeChange('annual')}
             >
               Annual
             </Button>
@@ -216,137 +224,115 @@ function App() {
           </div>
         )}
 
-        {/* Company Overview */}
-        {financialData && !loading && financialData.profile && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <div>
-                  <h2 className="text-2xl font-bold">{financialData.profile.companyName}</h2>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="secondary">{financialData.symbol}</Badge>
-                    <Badge variant="outline">{financialData.profile.exchange}</Badge>
-                    {financialData.profile.sector && (
-                      <Badge variant="outline">{financialData.profile.sector}</Badge>
-                    )}
-                  </div>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {financialData.quote && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="text-xs text-muted-foreground">Price</p>
-                        <p className="font-semibold">${financialData.quote.price?.toFixed(2)}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="text-xs text-muted-foreground">Change</p>
-                        <p className={`font-semibold ${financialData.quote.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {financialData.quote.change >= 0 ? '+' : ''}${financialData.quote.change?.toFixed(2)} ({financialData.quote.changePercent?.toFixed(2)}%)
-                        </p>
-                      </div>
-                    </div>
-                  </>
-                )}
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Market Cap</p>
-                    <p className="font-semibold">
-                      ${financialData.profile.marketCap ? (financialData.profile.marketCap / 1000000000).toFixed(1) + 'B' : 'N/A'}
-                    </p>
-                  </div>
-                </div>
+        {/* Financial Data Display */}
+        {financialData && (
+          <div className="space-y-6">
+            {/* Company Overview */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-xs text-muted-foreground">Industry</p>
-                  <p className="font-semibold text-sm">{financialData.profile.industry || 'N/A'}</p>
+                  <p className="font-semibold">{financialData.profile?.industry || 'N/A'}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Financial Charts Grid */}
-        {financialData && !loading && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {/* Price Chart */}
-            <div className="xl:col-span-1">
-              <PriceChart 
-                data={financialData.historicalData} 
-                ticker={financialData.symbol}
-                timeframe={timeframe === 'annual' ? '20Y' : '5Y'}
-              />
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Market Cap</p>
+                  <p className="font-semibold">{financialData.profile?.marketCap ? formatMarketCap(financialData.profile.marketCap) : 'N/A'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Employees</p>
+                  <p className="font-semibold">{financialData.profile?.fullTimeEmployees?.toLocaleString() || 'N/A'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Globe className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Country</p>
+                  <p className="font-semibold">{financialData.profile?.country || 'N/A'}</p>
+                </div>
+              </div>
             </div>
 
-            {/* Revenue Chart */}
-            <div className="xl:col-span-1">
-              <RevenueChart 
-                data={financialData.incomeStatement} 
-                timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
-              />
-            </div>
+            {/* Financial Charts Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              {/* Price Chart */}
+              <div className="xl:col-span-1">
+                <PriceChart 
+                  data={financialData.historicalData} 
+                  ticker={financialData.symbol}
+                  timeframe={timeframe === 'annual' ? '20Y' : '5Y'}
+                />
+              </div>
 
-            {/* EBITDA Chart */}
-            <div className="xl:col-span-1">
-              <EBITDAChart 
-                data={financialData.incomeStatement} 
-                timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
-              />
-            </div>
+              {/* Revenue Chart */}
+              <div className="xl:col-span-1">
+                <RevenueChart 
+                  data={financialData.incomeStatement} 
+                  timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
+                />
+              </div>
 
-            {/* Free Cash Flow Chart */}
-            <div className="xl:col-span-1">
-              <CashFlowChart 
-                data={financialData.cashFlowStatement} 
-                timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
-              />
-            </div>
+              {/* EBITDA Chart */}
+              <div className="xl:col-span-1">
+                <EBITDAChart 
+                  data={financialData.incomeStatement} 
+                  timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
+                />
+              </div>
 
-            {/* Net Income Chart */}
-            <div className="xl:col-span-1">
-              <NetIncomeChart 
-                data={financialData.incomeStatement} 
-                timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
-              />
-            </div>
+              {/* Free Cash Flow Chart */}
+              <div className="xl:col-span-1">
+                <CashFlowChart 
+                  data={financialData.cashFlowStatement} 
+                  timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
+                />
+              </div>
 
-            {/* EPS Chart */}
-            <div className="xl:col-span-1">
-              <EPSChart 
-                data={financialData.earningsData} 
-                timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
-              />
-            </div>
+              {/* Net Income Chart */}
+              <div className="xl:col-span-1">
+                <NetIncomeChart 
+                  data={financialData.incomeStatement} 
+                  timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
+                />
+              </div>
 
-            {/* Cash & Debt Chart */}
-            <div className="xl:col-span-1">
-              <CashDebtChart 
-                data={financialData.balanceSheet} 
-                timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
-              />
-            </div>
+              {/* EPS Chart */}
+              <div className="xl:col-span-1">
+                <EPSChart 
+                  data={financialData.earningsData} 
+                  timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
+                />
+              </div>
 
-            {/* Shares Outstanding Chart */}
-            <div className="xl:col-span-1">
-              <SharesOutstandingChart 
-                data={financialData.balanceSheet} 
-                timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
-              />
-            </div>
+              {/* Cash & Debt Chart */}
+              <div className="xl:col-span-1">
+                <CashDebtChart 
+                  data={financialData.balanceSheet} 
+                  timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
+                />
+              </div>
 
-            {/* Dividends Chart */}
-            <div className="xl:col-span-1">
-              <DividendsChart 
-                data={financialData.dividendsData} 
-                timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
-              />
+              {/* Shares Outstanding Chart */}
+              <div className="xl:col-span-1">
+                <SharesOutstandingChart 
+                  data={financialData.balanceSheet} 
+                  timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
+                />
+              </div>
+
+              {/* Dividends Chart */}
+              <div className="xl:col-span-1">
+                <DividendsChart 
+                  data={financialData.dividendsData} 
+                  timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
+                />
+              </div>
             </div>
           </div>
         )}
