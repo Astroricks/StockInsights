@@ -482,89 +482,42 @@ export const fetchBalanceSheet = async (symbol) => {
 };
 
 // ===== COMPANY OVERVIEW =====
-export const fetchCompanyProfile = async (symbol) => {
+export const fetchCompanyOverview = async (symbol) => {
   try {
     validateApiKey(symbol);
     
     // Check cache first
     const cached = getCachedData(symbol, 'overview');
-    if (cached) return cached;
+    if (cached) {
+      return cached;
+    }
 
-    const response = await alphaVantageApi.get('', {
+    const response = await axios.get(`${ALPHA_VANTAGE_BASE_URL}/query`, {
       params: addApiKey({
         function: 'OVERVIEW',
-        symbol: symbol.toUpperCase()
+        symbol: symbol
       })
     });
 
     const data = response.data;
-    
-    if (data['Error Message']) {
-      throw new Error(`Invalid symbol: ${symbol}`);
-    }
-    
+
     if (isRateLimited(data)) {
       throw new Error(getRateLimitMessage(data));
     }
 
-    if (!data.Symbol) {
-      throw new Error(`No company profile found for symbol: ${symbol}`);
+    if (!data || Object.keys(data).length === 0) {
+      throw new Error('No data received from API');
     }
 
-    const profile = {
-      symbol: data.Symbol,
-      companyName: data.Name,
-      description: data.Description,
-      sector: data.Sector,
-      industry: data.Industry,
-      exchange: data.Exchange,
-      currency: data.Currency,
-      country: data.Country,
-      marketCap: parseInt(data.MarketCapitalization) || 0,
-      peRatio: parseFloat(data.PERatio) || 0,
-      pegRatio: parseFloat(data.PEGRatio) || 0,
-      bookValue: parseFloat(data.BookValue) || 0,
-      dividendPerShare: parseFloat(data.DividendPerShare) || 0,
-      dividendYield: parseFloat(data.DividendYield) || 0,
-      eps: parseFloat(data.EPS) || 0,
-      revenuePerShareTTM: parseFloat(data.RevenuePerShareTTM) || 0,
-      profitMargin: parseFloat(data.ProfitMargin) || 0,
-      operatingMarginTTM: parseFloat(data.OperatingMarginTTM) || 0,
-      returnOnAssetsTTM: parseFloat(data.ReturnOnAssetsTTM) || 0,
-      returnOnEquityTTM: parseFloat(data.ReturnOnEquityTTM) || 0,
-      revenueTTM: parseInt(data.RevenueTTM) || 0,
-      grossProfitTTM: parseInt(data.GrossProfitTTM) || 0,
-      dilutedEPSTTM: parseFloat(data.DilutedEPSTTM) || 0,
-      quarterlyEarningsGrowthYOY: parseFloat(data.QuarterlyEarningsGrowthYOY) || 0,
-      quarterlyRevenueGrowthYOY: parseFloat(data.QuarterlyRevenueGrowthYOY) || 0,
-      analystTargetPrice: parseFloat(data.AnalystTargetPrice) || 0,
-      trailingPE: parseFloat(data.TrailingPE) || 0,
-      forwardPE: parseFloat(data.ForwardPE) || 0,
-      priceToSalesRatioTTM: parseFloat(data.PriceToSalesRatioTTM) || 0,
-      priceToBookRatio: parseFloat(data.PriceToBookRatio) || 0,
-      evToRevenue: parseFloat(data.EVToRevenue) || 0,
-      evToEBITDA: parseFloat(data.EVToEBITDA) || 0,
-      beta: parseFloat(data.Beta) || 0,
-      week52High: parseFloat(data['52WeekHigh']) || 0,
-      week52Low: parseFloat(data['52WeekLow']) || 0,
-      day50MovingAverage: parseFloat(data['50DayMovingAverage']) || 0,
-      day200MovingAverage: parseFloat(data['200DayMovingAverage']) || 0,
-      sharesOutstanding: parseInt(data.SharesOutstanding) || 0,
-      dividendDate: data.DividendDate,
-      exDividendDate: data.ExDividendDate
-    };
-
-    // Only cache if we have valid profile data (has symbol and name)
-    if (profile.symbol && profile.companyName) {
-      setCachedData(symbol, 'overview', profile);
-    }
+    // Cache the data
+    setCachedData(symbol, 'overview', data);
     
-    return profile;
+    return data;
   } catch (error) {
     if (error.response?.status === 429) {
       throw new Error('API rate limit exceeded. Please try again tomorrow.');
     }
-    throw new Error(`Failed to fetch company profile: ${error.message}`);
+    throw new Error(`Failed to fetch company overview: ${error.message}`);
   }
 };
 
@@ -739,7 +692,7 @@ export const fetchAllFinancialData = async (symbol, period = 'quarterly') => {
     
     // Fetch all data with proper error handling
     const [
-      profile,
+      overview,
       historicalData,
       incomeStatement,
       cashFlowStatement,
@@ -747,7 +700,7 @@ export const fetchAllFinancialData = async (symbol, period = 'quarterly') => {
       earningsData,
       dividendsData
     ] = await Promise.allSettled([
-      fetchCompanyProfile(symbol),
+      fetchCompanyOverview(symbol),
       fetchHistoricalData(symbol),
       fetchIncomeStatement(symbol),
       fetchCashFlowStatement(symbol),
@@ -758,7 +711,7 @@ export const fetchAllFinancialData = async (symbol, period = 'quarterly') => {
 
     const result = {
       symbol: symbol.toUpperCase(),
-      profile: profile.status === 'fulfilled' ? profile.value : null,
+      profile: overview.status === 'fulfilled' ? overview.value : null,
       originalHistoricalData: historicalData.status === 'fulfilled' ? historicalData.value : [],
       historicalData: historicalData.status === 'fulfilled' ? filterHistoricalData(historicalData.value, period) : [],
       incomeStatement: incomeStatement.status === 'fulfilled' ? incomeStatement.value : { annual: [], quarterly: [] },
@@ -771,7 +724,7 @@ export const fetchAllFinancialData = async (symbol, period = 'quarterly') => {
 
     // Collect any errors
     const requests = [
-      { name: 'Profile', result: profile },
+      { name: 'Overview', result: overview },
       { name: 'Historical Data', result: historicalData },
       { name: 'Income Statement', result: incomeStatement },
       { name: 'Cash Flow', result: cashFlowStatement },
@@ -875,7 +828,7 @@ export const getCacheInfo = () => {
 };
 
 export default {
-  fetchCompanyProfile,
+  fetchCompanyOverview,
   fetchHistoricalData,
   fetchIncomeStatement,
   fetchCashFlowStatement,

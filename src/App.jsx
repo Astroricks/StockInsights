@@ -13,6 +13,7 @@ import EPSChart from './components/EPSChart';
 import CashDebtChart from './components/CashDebtChart';
 import SharesOutstandingChart from './components/SharesOutstandingChart';
 import DividendsChart from './components/DividendsChart';
+import CompanyOverview from './components/CompanyOverview';
 import ErrorMessage from './components/ErrorMessage';
 import StockButton from './components/StockButton';
 import SettingsModal from './components/SettingsModal';
@@ -115,7 +116,7 @@ function App() {
               <TrendingUp className="h-8 w-8 text-primary" />
               <div>
                 <h1 className="text-2xl font-bold text-foreground">
-                  SeeTrend Insights - {currentTicker || 'Stock Research'}
+                  Seemple Insights - {currentTicker || 'Stock Research'}
                 </h1>
                 <p className="text-sm text-muted-foreground">
                   Comprehensive financial analysis and insights
@@ -228,36 +229,7 @@ function App() {
         {financialData && (
           <div className="space-y-6">
             {/* Company Overview */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Industry</p>
-                  <p className="font-semibold">{financialData.profile?.industry || 'N/A'}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Market Cap</p>
-                  <p className="font-semibold">{financialData.profile?.marketCap ? formatMarketCap(financialData.profile.marketCap) : 'N/A'}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Employees</p>
-                  <p className="font-semibold">{financialData.profile?.fullTimeEmployees?.toLocaleString() || 'N/A'}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Globe className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Country</p>
-                  <p className="font-semibold">{financialData.profile?.country || 'N/A'}</p>
-                </div>
-              </div>
-            </div>
+            <CompanyOverview profile={financialData.profile} />
 
             {/* Financial Charts Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -342,7 +314,7 @@ function App() {
           <div className="text-center py-12">
             <TrendingUp className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-2xl font-semibold text-foreground mb-2">
-              Welcome to SeeTrend Financial Insights
+              Welcome to Seemple Financial Insights
             </h2>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               Enter a stock ticker symbol above to get comprehensive financial analysis including 
