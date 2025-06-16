@@ -33,7 +33,7 @@ A modern React application for comprehensive stock research and financial analys
 The application uses the following Alpha Vantage API endpoints:
 
 1. **OVERVIEW** - Company profile and basic information
-2. **TIME_SERIES_DAILY** - Historical daily price data
+2. **TIME_SERIES_WEEKLY** - Historical weekly price data
 3. **INCOME_STATEMENT** - Income statement data
 4. **CASH_FLOW** - Cash flow statement data
 5. **BALANCE_SHEET** - Balance sheet data

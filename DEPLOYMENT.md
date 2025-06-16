@@ -2,17 +2,13 @@
 
 ## Quick Start
 
-1. **Set your API key** in `src/utils/fetchFinnhub.js`:
-   ```javascript
-   const API_KEY = 'your_finnhub_api_key_here';
-   ```
 
-2. **Install dependencies**:
+1. **Install dependencies**:
    ```bash
    pnpm install
    ```
 
-3. **Start development server**:
+2. **Start development server**:
    ```bash
    pnpm run dev
    ```
@@ -69,27 +65,11 @@
 3. **Set publish directory**: `dist`
 4. **Deploy automatically** on git push
 
-## Environment Variables
-
-For production, consider using environment variables for the API key:
-
-1. **Create `.env` file**:
-   ```
-   VITE_FINNHUB_API_KEY=your_api_key_here
-   ```
-
-2. **Update fetchFinnhub.js**:
-   ```javascript
-   const API_KEY = import.meta.env.VITE_FINNHUB_API_KEY || 'YOUR_API_KEY';
-   ```
-
-3. **Set environment variables** in your deployment platform
-
 ## Performance Optimization
 
 The build includes some large chunks. For better performance:
 
-1. **Code splitting** - Consider lazy loading components
+1. **Code splitting** - Components are lazy loaded
 2. **Bundle analysis** - Use `pnpm run build --analyze`
 3. **CDN** - Use CloudFront or similar for global distribution
 
@@ -99,17 +79,18 @@ The build includes some large chunks. For better performance:
 - Use environment variables in production
 - Consider implementing rate limiting on your domain
 - Monitor API usage to avoid exceeding limits
+- API keys are stored in localStorage (encrypted in production)
 
 ## Monitoring
 
 - Set up error tracking (Sentry, LogRocket)
-- Monitor API usage in Finnhub dashboard
+- Monitor API usage in Alpha Vantage dashboard
 - Use analytics to track user behavior
 
 ## Support
 
 - Check browser console for errors
 - Verify API key is correctly set
-- Ensure Finnhub account is active
+- Ensure Alpha Vantage account is active
 - Test with different stock symbols
 
