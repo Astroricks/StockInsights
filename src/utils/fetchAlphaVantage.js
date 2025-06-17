@@ -40,7 +40,7 @@ export const validateApiKey = (ticker) => {
   
   // Check if API key is set
   if (!API_KEY || API_KEY === 'demo') {
-    throw new Error('Please set your Alpha Vantage API key in Settings to search for stocks other than IBM.');
+    throw new Error('Please set your Alpha Vantage API key in Settings(on the upper right corner) to search for stocks other than IBM.');
   }
   
   return true;
