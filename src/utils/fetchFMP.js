@@ -5,7 +5,7 @@ const FMP_BASE_URL = 'https://financialmodelingprep.com/api/v3';
 
 // Note: In production, this should be moved to environment variables
 // For now, users will need to replace 'YOUR_API_KEY' with their actual FMP API key
-const API_KEY = 'WTGc78tUCPZu91pfgwjhEDbE10ABfodC';
+const API_KEY = 'YOUR_API_KEY';
 
 // Create axios instance with default config
 const fmpApi = axios.create({

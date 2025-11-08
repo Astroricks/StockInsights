@@ -69,6 +69,7 @@ The application uses the following Alpha Vantage API endpoints:
 1. **Node.js** (v18 or higher)
 2. **pnpm** package manager
 3. **Alpha Vantage API Key** from [Alpha Vantage](https://www.alphavantage.co/support/#api-key)
+4. **Auth0 Account** (for user authentication) - [Sign up for free](https://auth0.com/)
 
 ## 🚀 Quick Start
 
@@ -79,18 +80,40 @@ The application uses the following Alpha Vantage API endpoints:
 pnpm install
 ```
 
-### 2. API Key Setup
+### 2. Auth0 Configuration
+
+1. Sign up for a free Auth0 account at [auth0.com](https://auth0.com/)
+2. Create a new Application (Single Page Web Application)
+3. Configure the following in Auth0 Dashboard:
+   - **Allowed Callback URLs**: `http://localhost:5173/StockInsights/`
+   - **Allowed Logout URLs**: `http://localhost:5173/StockInsights/`
+   - **Allowed Web Origins**: `http://localhost:5173`
+4. Copy your Auth0 Domain and Client ID
+5. Create `src/auth_config.json` from the template:
+   ```bash
+   cp src/auth_config.json.example src/auth_config.json
+   ```
+6. Update `src/auth_config.json` with your Auth0 credentials:
+   ```json
+   {
+     "domain": "your-auth0-domain.auth0.com",
+     "clientId": "your-auth0-client-id",
+     "redirectUri": "http://localhost:5173/StockInsights/",
+     "logoutReturnTo": "http://localhost:5173/StockInsights/"
+   }
+   ```
+
+### 3. Alpha Vantage API Key Setup
 
 1. Sign up for a free account at [Alpha Vantage](https://www.alphavantage.co/support/#api-key)
 2. Get your API key from the dashboard
-3. Open `src/utils/fetchAlphaVantage.js`
-4. Replace `'YOUR_ALPHA_VANTAGE_API_KEY'` with your actual API key:
+3. Start the application and click the Settings icon (⚙️) in the top right
+4. Enter your Alpha Vantage API key in the Settings modal
+5. The key will be stored in your browser's localStorage
 
-```javascript
-const API_KEY = 'your_actual_api_key_here';
-```
+> **Note**: The demo key works for IBM stock only. You need your own API key to search for other stocks.
 
-### 3. Development
+### 4. Development
 
 ```bash
 # Start development server
@@ -99,7 +122,7 @@ pnpm run dev
 # Open http://localhost:5173 in your browser
 ```
 
-### 4. Production Build
+### 5. Production Build
 
 ```bash
 # Create production build
@@ -277,13 +300,50 @@ If you're migrating from the previous FMP version:
 
 See `ALPHA_VANTAGE_MIGRATION.md` for detailed migration information.
 
+## 🔒 Security & Sensitive Information
+
+**⚠️ Important**: Never commit sensitive information to the repository.
+
+### Files Excluded from Git
+
+The following files contain sensitive information and are excluded from version control (see `.gitignore`):
+
+- `src/auth_config.json` - Contains Auth0 domain and client ID
+- `.env*` - Environment variables (if used)
+- `dist/` - Build outputs
+
+### Setup for New Developers
+
+1. Copy the example configuration file:
+   ```bash
+   cp src/auth_config.json.example src/auth_config.json
+   ```
+
+2. Update `src/auth_config.json` with your own Auth0 credentials
+
+3. Never commit `auth_config.json` or any files containing API keys or secrets
+
+### What's Safe to Commit
+
+- ✅ `src/auth_config.json.example` - Template file with placeholders
+- ✅ Source code (without hardcoded secrets)
+- ✅ Configuration templates
+
+### What's NOT Safe to Commit
+
+- ❌ `src/auth_config.json` - Contains real Auth0 credentials
+- ❌ API keys in source code
+- ❌ Environment variables with real values
+- ❌ Any hardcoded secrets or tokens
+
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
 4. Test thoroughly with Alpha Vantage API
-5. Submit a pull request
+5. Ensure no sensitive information is committed
+6. Submit a pull request
 
 ## 📄 License
 

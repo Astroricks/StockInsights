@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import SignInButton from './components/SignInButton';
 import { Input } from '@/components/ui/input';
 import { Search, Loader2, TrendingUp, Building2, DollarSign, Settings, Users, Globe } from 'lucide-react';
 
@@ -124,14 +125,18 @@ function App() {
               </div>
             </div>
             
-            {/* Settings Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowSettings(true)}
-            >
-              <Settings className="h-5 w-5" />
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* Sign In / Sign Out */}
+              <SignInButton />
+              {/* Settings Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowSettings(true)}
+              >
+                <Settings className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>
