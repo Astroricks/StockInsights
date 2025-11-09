@@ -1,8 +1,8 @@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, RefreshCw, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-const ErrorMessage = ({ error, onRetry }) => {
+const ErrorMessage = ({ error, onRetry, loginRequired, onLogin }) => {
   if (!error) return null;
 
   const getErrorMessage = (error) => {
@@ -18,22 +18,35 @@ const ErrorMessage = ({ error, onRetry }) => {
   const errorMessage = getErrorMessage(error);
 
   return (
-    <Alert variant="destructive" className="mb-6">
+    <Alert variant={loginRequired ? "default" : "destructive"} className="mb-6">
       <AlertCircle className="h-4 w-4" />
-      <AlertTitle>Error</AlertTitle>
+      <AlertTitle>{loginRequired ? 'Login Required' : 'Error'}</AlertTitle>
       <AlertDescription className="mt-2">
         <p className="mb-3">{errorMessage}</p>
-        {onRetry && (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={onRetry}
-            className="bg-background hover:bg-muted"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Try Again
-          </Button>
-        )}
+        <div className="flex gap-2 flex-wrap">
+          {loginRequired && onLogin && (
+            <Button 
+              variant="default" 
+              size="sm" 
+              onClick={onLogin}
+              className="bg-primary hover:bg-primary/90"
+            >
+              <LogIn className="h-4 w-4 mr-2" />
+              Sign In
+            </Button>
+          )}
+          {onRetry && !loginRequired && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onRetry}
+              className="bg-background hover:bg-muted"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
+          )}
+        </div>
       </AlertDescription>
     </Alert>
   );

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
 import { Button } from '@/components/ui/button';
 import SignInButton from './components/SignInButton';
 import { Input } from '@/components/ui/input';
@@ -34,28 +35,49 @@ const formatMarketCap = (value) => {
 };
 
 function App() {
+  const { isAuthenticated, isLoading: authLoading, loginWithRedirect } = useAuth0();
   const [financialData, setFinancialData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [currentTicker, setCurrentTicker] = useState('IBM');
+  const [currentTicker, setCurrentTicker] = useState('');
   const [searchTicker, setSearchTicker] = useState('');
   const [timeframe, setTimeframe] = useState('quarter');
   const [showSettings, setShowSettings] = useState(false);
+  const [loginRequired, setLoginRequired] = useState(false);
 
   // Initialize API key on mount
   useEffect(() => {
     initializeApiKey();
   }, []);
 
-  const handleSearch = async (ticker) => {
-    try {
+  // Clear login-required error when user successfully authenticates
+  useEffect(() => {
+    if (isAuthenticated && loginRequired) {
+      setLoginRequired(false);
       setError(null);
-      setCurrentTicker(ticker);
-      setSearchTicker(ticker);
+    }
+  }, [isAuthenticated, loginRequired]);
+
+  const handleSearch = async (ticker) => {
+    // Reset error states
+    setError(null);
+    setLoginRequired(false);
+
+    // Check if login is required for non-IBM stocks
+    const normalizedTicker = ticker.trim().toUpperCase();
+    if (normalizedTicker !== 'IBM' && !isAuthenticated) {
+      setLoginRequired(true);
+      setError('Please sign in to search for stocks other than IBM.');
+      return;
+    }
+
+    try {
+      setCurrentTicker(normalizedTicker);
+      setSearchTicker(normalizedTicker);
       setLoading(true);
       
       // Fetch all data
-      const result = await fetchAllFinancialData(ticker);
+      const result = await fetchAllFinancialData(normalizedTicker);
       setFinancialData(result);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -166,15 +188,15 @@ function App() {
             <form onSubmit={handleSubmit} className="flex gap-2">
               <Input
                 type="text"
-                placeholder="Enter stock ticker (e.g., IBM)"
+                placeholder={isAuthenticated ? "Enter stock ticker (e.g., IBM)" : "Enter stock ticker (IBM demo, others require login)"}
                 value={searchTicker}
                 onChange={(e) => setSearchTicker(e.target.value.toUpperCase())}
                 className="w-full md:w-64"
-                disabled={loading}
+                disabled={loading || authLoading}
               />
               <Button 
                 type="submit" 
-                disabled={loading || !searchTicker.trim()}
+                disabled={loading || authLoading || !searchTicker.trim()}
                 className="px-6"
               >
                 <Search className="h-4 w-4 mr-2" />
@@ -214,7 +236,12 @@ function App() {
         {/* Error Message */}
         {error && (
           <div className="mb-6">
-            <ErrorMessage error={error} onRetry={handleRetry} />
+            <ErrorMessage 
+              error={error} 
+              onRetry={handleRetry}
+              loginRequired={loginRequired}
+              onLogin={loginRequired ? () => loginWithRedirect() : undefined}
+            />
           </div>
         )}
       </div>
@@ -324,6 +351,11 @@ function App() {
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               Enter a stock ticker symbol above to get comprehensive financial insights including 
               revenue, EBITDA, cash flow, and more.
+              {!isAuthenticated && (
+                <span className="block mt-2 text-sm text-orange-600 dark:text-orange-400">
+                  IBM is available as a demo. Sign in to search for other stocks.
+                </span>
+              )}
             </p>
             <div className="text-sm text-muted-foreground mb-8">
               <p className="mb-2">Try the demo stock:</p>
@@ -339,14 +371,21 @@ function App() {
               </div>
             </div>
             <div className="text-sm text-muted-foreground">
-              <p className="mb-2">Try popular stocks like:</p>
+              <p className="mb-2">
+                Try popular stocks like:{' '}
+                {!isAuthenticated && (
+                  <span className="text-orange-600 dark:text-orange-400 font-medium">
+                    (Sign in required)
+                  </span>
+                )}
+              </p>
               <div className="flex flex-wrap justify-center gap-2">
                 {['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META'].map((ticker) => (
                   <StockButton
                     key={ticker}
                     ticker={ticker}
                     onSearch={handleSearch}
-                    disabled={loading}
+                    disabled={loading || authLoading}
                   />
                 ))}
               </div>
