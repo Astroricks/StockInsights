@@ -3,7 +3,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { Button } from '@/components/ui/button';
 import SignInButton from './components/SignInButton';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2, TrendingUp, Building2, DollarSign, Settings, Users, Globe } from 'lucide-react';
+import { Search, Loader2, TrendingUp, Building2, DollarSign, Users, Globe } from 'lucide-react';
 
 // Import chart components
 import PriceChart from './components/PriceChart';
@@ -18,10 +18,11 @@ import DividendsChart from './components/DividendsChart';
 import CompanyOverview from './components/CompanyOverview';
 import ErrorMessage from './components/ErrorMessage';
 import StockButton from './components/StockButton';
-import SettingsModal from './components/SettingsModal';
 
 // Import Alpha Vantage API functions
-import { fetchAllFinancialData, clearCache, filterHistoricalData, initializeApiKey, updateApiKey } from './utils/fetchAlphaVantage';
+import { fetchAllFinancialData, clearCache, filterHistoricalData, initializeApiKey, setApiKeyForUser } from './utils/fetchAlphaVantage';
+import { checkRateLimit, recordSearch, getRemainingSearches } from './utils/rateLimit';
+import authConfig from './auth_config.json';
 import './App.css';
 
 // Format market cap to B/M/K format
@@ -35,26 +36,61 @@ const formatMarketCap = (value) => {
 };
 
 function App() {
-  const { isAuthenticated, isLoading: authLoading, loginWithRedirect } = useAuth0();
+  const { isAuthenticated, isLoading: authLoading, loginWithRedirect, user } = useAuth0();
   const [financialData, setFinancialData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [currentTicker, setCurrentTicker] = useState('');
   const [searchTicker, setSearchTicker] = useState('');
   const [timeframe, setTimeframe] = useState('quarter');
-  const [showSettings, setShowSettings] = useState(false);
   const [loginRequired, setLoginRequired] = useState(false);
+  const [rateLimitInfo, setRateLimitInfo] = useState(null);
+  const [nextSearchAllowedAt, setNextSearchAllowedAt] = useState(null);
 
-  // Initialize API key on mount
+  // Update rate limit information display
+  const updateRateLimitInfo = () => {
+    if (isAuthenticated && user?.sub) {
+      const info = getRemainingSearches(user.sub);
+      setRateLimitInfo(info);
+    }
+  };
+
+  // Initialize API key on mount and when auth state changes
   useEffect(() => {
-    initializeApiKey();
-  }, []);
+    if (isAuthenticated && user) {
+      // Use shared API key for authenticated users
+      const sharedKey = authConfig.sharedApiKey;
+      if (sharedKey && sharedKey !== 'YOUR_SHARED_ALPHA_VANTAGE_API_KEY') {
+        setApiKeyForUser(true, sharedKey);
+      } else {
+        initializeApiKey();
+      }
+      // Update rate limit info for authenticated users
+      updateRateLimitInfo();
+    } else {
+      // Use demo key for unauthenticated users
+      initializeApiKey();
+    }
+  }, [isAuthenticated, user]);
+
+  // Update rate limit info periodically
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      updateRateLimitInfo();
+      // Update every minute to show accurate remaining time
+      const interval = setInterval(updateRateLimitInfo, 60000);
+      return () => clearInterval(interval);
+    } else {
+      setRateLimitInfo(null);
+    }
+  }, [isAuthenticated, user]);
 
   // Clear login-required error when user successfully authenticates
   useEffect(() => {
     if (isAuthenticated && loginRequired) {
       setLoginRequired(false);
       setError(null);
+      updateRateLimitInfo();
     }
   }, [isAuthenticated, loginRequired]);
 
@@ -71,6 +107,30 @@ function App() {
       return;
     }
 
+    // Check rate limit for authenticated users (IBM is exempt)
+    if (isAuthenticated && user?.sub && normalizedTicker !== 'IBM') {
+      const rateLimitCheck = checkRateLimit(user.sub, normalizedTicker);
+      if (!rateLimitCheck.allowed) {
+        setError(rateLimitCheck.error || 'Rate limit exceeded. Please try again later.');
+        setNextSearchAllowedAt(rateLimitCheck.nextSearchAllowedAt || null);
+        updateRateLimitInfo();
+        
+        // If it's a per-minute limit, set up a countdown to automatically clear the error
+        if (rateLimitCheck.nextSearchAllowedAt) {
+          const timeUntilNext = rateLimitCheck.nextSearchAllowedAt - Date.now();
+          if (timeUntilNext > 0) {
+            setTimeout(() => {
+              setNextSearchAllowedAt(null);
+              // Optionally clear error after the wait period
+            }, timeUntilNext);
+          }
+        }
+        return;
+      } else {
+        setNextSearchAllowedAt(null);
+      }
+    }
+
     try {
       setCurrentTicker(normalizedTicker);
       setSearchTicker(normalizedTicker);
@@ -79,6 +139,12 @@ function App() {
       // Fetch all data
       const result = await fetchAllFinancialData(normalizedTicker);
       setFinancialData(result);
+      
+      // Record the search for rate limiting (only for authenticated users and non-IBM)
+      if (isAuthenticated && user?.sub && normalizedTicker !== 'IBM') {
+        recordSearch(user.sub, normalizedTicker);
+        updateRateLimitInfo();
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
       setError(error.message || 'An error occurred while fetching data');
@@ -121,13 +187,6 @@ function App() {
     setSearchTicker('');
   };
 
-  const handleApiKeyUpdate = (newKey) => {
-    updateApiKey(newKey);
-    // If we have a current ticker that's not IBM, refresh the data
-    if (currentTicker && currentTicker !== 'IBM') {
-      handleSearch(currentTicker);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -150,35 +209,48 @@ function App() {
             <div className="flex items-center gap-2">
               {/* Sign In / Sign Out */}
               <SignInButton />
-              {/* Settings Button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowSettings(true)}
-              >
-                <Settings className="h-5 w-5" />
-              </Button>
             </div>
           </div>
         </div>
       </header>
 
       {/* Rate Limiting Information Banner */}
-      <div className="bg-yellow-50 border-b border-yellow-200">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-              <span className="text-yellow-800">
-                <strong>Free Tier:</strong> 25 API calls/day • 7 calls per stock • ~3 stocks per day max
-              </span>
-            </div>
-            <div className="text-yellow-700">
-              <span>Cache stores data for 24 hours • Rate limit resets at midnight UTC</span>
+      {isAuthenticated && rateLimitInfo ? (
+        <div className="bg-blue-50 dark:bg-blue-950 border-b border-blue-200 dark:border-blue-800">
+          <div className="container mx-auto px-4 py-3">
+            <div className="flex items-center justify-between text-sm flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span className="text-blue-800 dark:text-blue-200">
+                  <strong>Your Limit:</strong> {rateLimitInfo.remaining} of {rateLimitInfo.total} searches remaining
+                  {rateLimitInfo.resetAt && (
+                    <span> (resets in {Math.max(0, Math.ceil((rateLimitInfo.resetAt - Date.now()) / (60 * 60 * 1000)))} hours)</span>
+                  )}
+                </span>
+              </div>
+              <div className="text-blue-700 dark:text-blue-300">
+                <span>1 search per minute • 10 unique stocks per 24 hours • IBM demo is unlimited</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-yellow-50 dark:bg-yellow-950 border-b border-yellow-200 dark:border-yellow-800">
+          <div className="container mx-auto px-4 py-3">
+            <div className="flex items-center justify-between text-sm flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                <span className="text-yellow-800 dark:text-yellow-200">
+                  <strong>Demo Mode:</strong> IBM stock available • Sign in to search other stocks (1 per minute, 10 per 24 hours)
+                </span>
+              </div>
+              <div className="text-yellow-700 dark:text-yellow-300">
+                <span>Cache stores data for 24 hours</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Search and Controls */}
       <div className="container mx-auto px-4 py-6">
@@ -405,11 +477,6 @@ function App() {
         </div>
       </footer>
 
-      <SettingsModal 
-        open={showSettings} 
-        onOpenChange={setShowSettings}
-        onApiKeyUpdate={handleApiKeyUpdate}
-      />
     </div>
   );
 }

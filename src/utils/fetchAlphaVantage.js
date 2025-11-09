@@ -3,8 +3,9 @@ import axios from 'axios';
 // Alpha Vantage API configuration
 const ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query';
 
-// Default to demo key, will be overridden by user's key if set
+// Default to demo key, will be overridden by shared key for authenticated users
 let API_KEY = 'demo';
+let SHARED_API_KEY = null;
 
 // Create axios instance with default config
 const alphaVantageApi = axios.create({
@@ -12,17 +13,38 @@ const alphaVantageApi = axios.create({
   timeout: 30000, // 30 second timeout for fundamental data
 });
 
-// Initialize API key from localStorage
-export const initializeApiKey = () => {
+// Initialize API key from config (for authenticated users) or localStorage (legacy support)
+export const initializeApiKey = (sharedApiKey = null) => {
+  SHARED_API_KEY = sharedApiKey;
+  // Check localStorage for legacy user-provided keys (for backward compatibility)
   const storedKey = localStorage.getItem('alpha_vantage_api_key');
   if (storedKey) {
     API_KEY = storedKey;
+  } else if (sharedApiKey) {
+    API_KEY = sharedApiKey;
+  } else {
+    API_KEY = 'demo';
   }
 };
 
-// Update API key
+// Update API key (legacy function, kept for backward compatibility)
 export const updateApiKey = (newKey) => {
-  API_KEY = newKey || 'demo';
+  // Only update if no shared key is set (shared key takes precedence)
+  if (!SHARED_API_KEY) {
+    API_KEY = newKey || 'demo';
+  }
+};
+
+// Set the API key to use (for authenticated users with shared key)
+export const setApiKeyForUser = (isAuthenticated, sharedApiKey) => {
+  if (isAuthenticated && sharedApiKey) {
+    API_KEY = sharedApiKey;
+    SHARED_API_KEY = sharedApiKey;
+  } else {
+    // Fall back to demo key or user's stored key
+    const storedKey = localStorage.getItem('alpha_vantage_api_key');
+    API_KEY = storedKey || 'demo';
+  }
 };
 
 // Add API key to request params
@@ -38,9 +60,9 @@ export const validateApiKey = (ticker) => {
     return true;
   }
   
-  // Check if API key is set
-  if (!API_KEY || API_KEY === 'demo') {
-    throw new Error('Please set your Alpha Vantage API key in Settings(on the upper right corner) to search for stocks other than IBM.');
+  // Check if API key is properly configured
+  if (!API_KEY || API_KEY === 'demo' || API_KEY === 'YOUR_SHARED_ALPHA_VANTAGE_API_KEY') {
+    throw new Error('Please sign in to search for stocks other than IBM.');
   }
   
   return true;
