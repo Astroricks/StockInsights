@@ -117,10 +117,10 @@ function App() {
               <TrendingUp className="h-8 w-8 text-primary" />
               <div>
                 <h1 className="text-2xl font-bold text-foreground">
-                  Seemple Insights - {currentTicker || 'Stock Research'}
+                  PrismFin Insights - {currentTicker || 'Stock Research'}
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Comprehensive financial analysis and insights
+                  Comprehensive financial insights
                 </p>
               </div>
             </div>
@@ -319,10 +319,10 @@ function App() {
           <div className="text-center py-12">
             <TrendingUp className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-2xl font-semibold text-foreground mb-2">
-              Welcome to Seemple Financial Insights
+              Welcome to PrismFin Insights
             </h2>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Enter a stock ticker symbol above to get comprehensive financial analysis including 
+              Enter a stock ticker symbol above to get comprehensive financial insights including 
               revenue, EBITDA, cash flow, and more.
             </p>
             <div className="text-sm text-muted-foreground mb-8">
