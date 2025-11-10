@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, Building2, Globe, DollarSign, Users, TrendingUp
 import { useState } from 'react';
 
 const CompanyOverview = ({ profile }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   if (!profile) return null;
 

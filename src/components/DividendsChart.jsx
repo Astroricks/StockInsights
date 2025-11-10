@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatTimeframeLabel } from '../utils/fetchAlphaVantage';
+import InfoButton from './InfoButton';
 
 const DividendsChart = ({ data, timeframe = 'Quarterly' }) => {
   if (!data || (!data.quarterly && !data.annual) || 
@@ -9,7 +10,10 @@ const DividendsChart = ({ data, timeframe = 'Quarterly' }) => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Dividends</span>
+            <div className="flex items-center gap-2">
+              <span>Dividends</span>
+              <InfoButton term="Dividends" />
+            </div>
             <span className="text-sm text-muted-foreground">{timeframe}</span>
           </CardTitle>
         </CardHeader>
@@ -81,6 +85,7 @@ const DividendsChart = ({ data, timeframe = 'Quarterly' }) => {
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span>Dividends</span>
+            <InfoButton term="Dividends" />
             {growth !== 0 && (
               <span className={`text-sm ${growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {growth >= 0 ? '+' : ''}{growth.toFixed(1)}%

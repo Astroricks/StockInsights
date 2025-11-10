@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatTimeframeLabel } from '../utils/fetchAlphaVantage';
+import InfoButton from './InfoButton';
 
 const CashDebtChart = ({ data, timeframe = 'Quarterly' }) => {
   // Select appropriate data based on timeframe
@@ -12,7 +13,10 @@ const CashDebtChart = ({ data, timeframe = 'Quarterly' }) => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Cash & Debt</span>
+            <div className="flex items-center gap-2">
+              <span>Cash & Debt</span>
+              <InfoButton term="Cash & Debt" />
+            </div>
             <span className="text-sm text-muted-foreground">{timeframe}</span>
           </CardTitle>
         </CardHeader>
@@ -68,6 +72,7 @@ const CashDebtChart = ({ data, timeframe = 'Quarterly' }) => {
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span>Cash & Debt</span>
+            <InfoButton term="Cash & Debt" />
             {netCash !== 0 && (
               <span className={`text-sm ${netCash >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 Net: {netCash >= 0 ? '$' : '-$'}{Math.abs(netCash / 1000000000).toFixed(2)}B

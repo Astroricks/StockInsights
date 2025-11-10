@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import InfoButton from './InfoButton';
 
 const PriceChart = ({ data, ticker, timeframe = '1Y' }) => {
   if (!data || data.length === 0) {
@@ -8,7 +9,10 @@ const PriceChart = ({ data, ticker, timeframe = '1Y' }) => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Price</span>
+            <div className="flex items-center gap-2">
+              <span>Price</span>
+              <InfoButton term="Price" />
+            </div>
             <span className="text-sm text-muted-foreground">{timeframe}</span>
           </CardTitle>
         </CardHeader>
@@ -55,6 +59,7 @@ const PriceChart = ({ data, ticker, timeframe = '1Y' }) => {
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span>Price</span>
+            <InfoButton term="Price" />
             <div className={`flex items-center gap-1 text-sm ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
               {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
               {isPositive ? '+' : ''}{priceChangePercent.toFixed(2)}%
