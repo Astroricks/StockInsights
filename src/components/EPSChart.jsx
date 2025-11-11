@@ -53,20 +53,23 @@ const EPSChart = ({ data, timeframe = 'Quarterly' }) => {
       const value = data.eps;
       const isPositive = value >= 0;
       const surprise = data.surprise;
+      const estimatedEPS = typeof data.estimatedEPS === 'number' ? data.estimatedEPS : parseFloat(data.estimatedEPS);
+      const surpriseValue = typeof surprise === 'number' ? surprise : parseFloat(surprise);
+      
       return (
         <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
           <p className="text-sm font-medium">{data.quarter}</p>
           <p className={`text-sm ${isPositive ? 'text-yellow-600' : 'text-red-600'}`}>
             Reported EPS: {isPositive ? '$' : '-$'}{Math.abs(value).toFixed(2)}
           </p>
-          {data.estimatedEPS && (
+          {!isNaN(estimatedEPS) && (
             <p className="text-sm text-muted-foreground">
-              Estimated: ${data.estimatedEPS.toFixed(2)}
+              Estimated: ${estimatedEPS.toFixed(2)}
             </p>
           )}
-          {surprise !== null && surprise !== undefined && (
-            <p className={`text-sm ${surprise >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              Surprise: {surprise >= 0 ? '+$' : '-$'}{Math.abs(surprise).toFixed(2)}
+          {!isNaN(surpriseValue) && (
+            <p className={`text-sm ${surpriseValue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              Surprise: {surpriseValue >= 0 ? '+$' : '-$'}{Math.abs(surpriseValue).toFixed(2)}
             </p>
           )}
           {data.reportedDate && (

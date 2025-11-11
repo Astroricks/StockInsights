@@ -506,9 +506,19 @@ export const fetchEarningsData = async (symbol) => {
     const quarterlyEarnings = data.quarterlyEarnings || [];
     const annualEarnings = data.annualEarnings || [];
 
+    // Transform data to match frontend expectations
+    const transformEarningsItem = (item) => ({
+      date: item.fiscalDateEnding,
+      reportedDate: item.reportedDate,
+      eps: parseFloat(item.reportedEPS) || 0,
+      estimatedEPS: parseFloat(item.estimatedEPS),
+      surprise: parseFloat(item.surprise),
+      surprisePercentage: parseFloat(item.surprisePercentage)
+    });
+
     const result = {
-      quarterly: quarterlyEarnings.slice(0, 24).reverse(),
-      annual: annualEarnings.reverse()
+      quarterly: quarterlyEarnings.slice(0, 24).reverse().map(transformEarningsItem),
+      annual: annualEarnings.reverse().map(transformEarningsItem)
     };
 
     if (result.quarterly.length > 0 || result.annual.length > 0) {
