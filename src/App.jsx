@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { Button } from '@/components/ui/button';
 import SignInButton from './components/SignInButton';
@@ -19,11 +19,11 @@ import CompanyOverview from './components/CompanyOverview';
 import ErrorMessage from './components/ErrorMessage';
 import StockButton from './components/StockButton';
 
-// Import Alpha Vantage API functions
-import { fetchAllFinancialData, clearCache, filterHistoricalData, initializeApiKey, setApiKeyForUser } from './utils/fetchAlphaVantage';
-import { checkRateLimit, recordSearch, getRemainingSearches } from './utils/rateLimit';
-import authConfig from './auth_config.json';
+// Import backend API helpers
+import { fetchAllFinancialData, clearCache, filterHistoricalData, fetchRateLimitInfo } from './utils/fetchAlphaVantage';
 import './App.css';
+
+const CLIENT_RATE_LIMIT_MS = 60_000;
 
 // Format market cap to B/M/K format
 const formatMarketCap = (value) => {
@@ -36,7 +36,7 @@ const formatMarketCap = (value) => {
 };
 
 function App() {
-  const { isAuthenticated, isLoading: authLoading, loginWithRedirect, user } = useAuth0();
+  const { isAuthenticated, isLoading: authLoading, loginWithRedirect } = useAuth0();
   const [financialData, setFinancialData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -45,45 +45,32 @@ function App() {
   const [timeframe, setTimeframe] = useState('quarter');
   const [loginRequired, setLoginRequired] = useState(false);
   const [rateLimitInfo, setRateLimitInfo] = useState(null);
-  const [nextSearchAllowedAt, setNextSearchAllowedAt] = useState(null);
+  const lastSearchTimestampRef = useRef(0);
 
-  // Update rate limit information display
-  const updateRateLimitInfo = () => {
-    if (isAuthenticated && user?.sub) {
-      const info = getRemainingSearches(user.sub);
-      setRateLimitInfo(info);
-    }
-  };
-
-  // Initialize API key on mount and when auth state changes
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      // Use shared API key for authenticated users
-      const sharedKey = authConfig.sharedApiKey;
-      if (sharedKey && sharedKey !== 'YOUR_SHARED_ALPHA_VANTAGE_API_KEY') {
-        setApiKeyForUser(true, sharedKey);
-      } else {
-        initializeApiKey();
-      }
-      // Update rate limit info for authenticated users
-      updateRateLimitInfo();
-    } else {
-      // Use demo key for unauthenticated users
-      initializeApiKey();
-    }
-  }, [isAuthenticated, user]);
-
-  // Update rate limit info periodically
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      updateRateLimitInfo();
-      // Update every minute to show accurate remaining time
-      const interval = setInterval(updateRateLimitInfo, 60000);
-      return () => clearInterval(interval);
-    } else {
+  const updateRateLimitInfo = useCallback(async () => {
+    if (!isAuthenticated) {
       setRateLimitInfo(null);
+      return;
     }
-  }, [isAuthenticated, user]);
+
+    try {
+      const info = await fetchRateLimitInfo();
+      setRateLimitInfo(info);
+    } catch (quotaError) {
+      console.warn('[RateLimit] Failed to fetch quota info', quotaError);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setRateLimitInfo(null);
+      return;
+    }
+
+    updateRateLimitInfo();
+    const interval = setInterval(updateRateLimitInfo, 60_000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, updateRateLimitInfo]);
 
   // Clear login-required error when user successfully authenticates
   useEffect(() => {
@@ -92,14 +79,12 @@ function App() {
       setError(null);
       updateRateLimitInfo();
     }
-  }, [isAuthenticated, loginRequired]);
+  }, [isAuthenticated, loginRequired, updateRateLimitInfo]);
 
   const handleSearch = async (ticker) => {
-    // Reset error states
     setError(null);
     setLoginRequired(false);
 
-    // Check if login is required for non-IBM stocks
     const normalizedTicker = ticker.trim().toUpperCase();
     if (normalizedTicker !== 'IBM' && !isAuthenticated) {
       setLoginRequired(true);
@@ -107,48 +92,37 @@ function App() {
       return;
     }
 
-    // Check rate limit for authenticated users (IBM is exempt)
-    if (isAuthenticated && user?.sub && normalizedTicker !== 'IBM') {
-      const rateLimitCheck = checkRateLimit(user.sub, normalizedTicker);
-      if (!rateLimitCheck.allowed) {
-        setError(rateLimitCheck.error || 'Rate limit exceeded. Please try again later.');
-        setNextSearchAllowedAt(rateLimitCheck.nextSearchAllowedAt || null);
-        updateRateLimitInfo();
-        
-        // If it's a per-minute limit, set up a countdown to automatically clear the error
-        if (rateLimitCheck.nextSearchAllowedAt) {
-          const timeUntilNext = rateLimitCheck.nextSearchAllowedAt - Date.now();
-          if (timeUntilNext > 0) {
-            setTimeout(() => {
-              setNextSearchAllowedAt(null);
-              // Optionally clear error after the wait period
-            }, timeUntilNext);
-          }
-        }
-        return;
-      } else {
-        setNextSearchAllowedAt(null);
-      }
+    const nowTimestamp = Date.now();
+    if (lastSearchTimestampRef.current && (nowTimestamp - lastSearchTimestampRef.current) < CLIENT_RATE_LIMIT_MS) {
+      const waitSeconds = Math.ceil((CLIENT_RATE_LIMIT_MS - (nowTimestamp - lastSearchTimestampRef.current)) / 1000);
+      setError(`Rate limit: Please wait ${waitSeconds} second(s) before searching again.`);
+      return;
     }
+    lastSearchTimestampRef.current = nowTimestamp;
 
     try {
       setCurrentTicker(normalizedTicker);
       setSearchTicker(normalizedTicker);
       setLoading(true);
-      
-      // Fetch all data
+
       const result = await fetchAllFinancialData(normalizedTicker);
-      setFinancialData(result);
-      
-      // Record the search for rate limiting (only for authenticated users and non-IBM)
-      if (isAuthenticated && user?.sub && normalizedTicker !== 'IBM') {
-        recordSearch(user.sub, normalizedTicker);
-        updateRateLimitInfo();
+      setFinancialData(result.data);
+      if (result.rateLimit) {
+        setRateLimitInfo(result.rateLimit);
       }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      setError(error.message || 'An error occurred while fetching data');
+    } catch (fetchError) {
+      console.error('Error fetching data:', fetchError);
+      const message = fetchError.message || 'An error occurred while fetching data';
+      setError(message);
       setFinancialData(null);
+
+      if (fetchError.status === 429 && fetchError.details) {
+        setRateLimitInfo(prev => ({
+          ...(prev ?? {}),
+          ...fetchError.details,
+        }));
+        await updateRateLimitInfo();
+      }
     } finally {
       setLoading(false);
     }
@@ -181,10 +155,10 @@ function App() {
 
   const handleClearCache = () => {
     clearCache();
-    alert('Cache cleared! You can now fetch fresh data.');
     setFinancialData(null);
     setCurrentTicker('');
     setSearchTicker('');
+    alert('Local cache cleared. Fresh data will be fetched on next search.');
   };
 
 
@@ -279,8 +253,8 @@ function App() {
               variant="outline" 
               size="sm" 
               onClick={handleClearCache}
-              disabled={loading}
-              title="Clear cached data to fetch fresh information"
+              disabled={loading || !isAuthenticated}
+              title={isAuthenticated ? "Clear cached data to fetch fresh information" : "Sign in to manage cached data"}
             >
               Clear Cache
             </Button>

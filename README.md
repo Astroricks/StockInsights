@@ -113,6 +113,36 @@ pnpm install
 
 > **Note**: The demo key works for IBM stock only. You need your own API key to search for other stocks.
 
+## 🏗️ Backend & Deployment
+
+The application now uses a dedicated AWS-backed API layer. The repository contains a `backend/` folder with the Lambda handlers. See [`backend/README.md`](backend/README.md) for full deployment instructions (API Gateway, Lambda, DynamoDB, Secrets Manager, CloudWatch).
+
+### Required Environment Variables
+
+Frontend (`.env`):
+
+```
+VITE_API_BASE_URL=https://your-api-gateway-id.execute-api.region.amazonaws.com/prod
+```
+
+Backend (Lambda):
+
+- `ALPHA_VANTAGE_SECRET_ID` – Secrets Manager secret containing the Alpha Vantage API key
+- `RATE_LIMIT_TABLE` – DynamoDB table for rate limiting
+- `METRICS_NAMESPACE` – CloudWatch metrics namespace (default: `StockInsights/Usage`)
+- `ALLOWED_ORIGIN` – Allowed CORS origin (e.g., your CloudFront domain)
+- Optional tuning variables: `RATE_LIMIT_DAILY_MAX`, `RATE_LIMIT_MIN_INTERVAL_MS`, `RATE_LIMIT_WINDOW_MS`, `API_KEY_CACHE_TTL_MS`
+
+### API Overview
+
+- `POST /stocks/search` – Fetches financial data, enforces rate limits, caches responses
+- `GET /quota` – Returns per-user quota (remaining searches, reset time, next allowed search)
+- `DELETE /cache?symbol=XYZ` – Clears cached data for a ticker (admin convenience)
+
+API responses include `Cache-Control` headers so API Gateway caching can be enabled for additional cost savings.
+
+The frontend still enforces a **client-side 1-search-per-minute** guard to reduce backend quota polling. The backend strictly enforces the **10 searches per 24 hours** quota.
+
 ### 4. Development
 
 ```bash
