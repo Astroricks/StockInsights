@@ -49,10 +49,10 @@ Additional (optional):
 1. **Install dependencies**
    ```bash
    cd backend
-   npm install
+   pnpm install
    ```
 
-2. **Package and deploy**
+2. **Package and deploy** *(requires the [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html); install it first if `sam` is not found)*
    ```bash
    sam build
    sam deploy --guided
@@ -95,6 +95,34 @@ node --loader ts-node/esm scripts/invoke-local.mjs
 ```
 
 Or use tools like [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli.html) (`sam local invoke`) / [Serverless Framework](https://www.serverless.com/framework/docs/providers/aws/cli-reference/invoke-local/).
+
+### Local API Development with SAM
+
+To spin up the API locally and point your frontend at it:
+
+```bash
+sam local start-api \
+  --env-vars env.local.json
+```
+
+- Create an `env.local.json` file with the environment variables your Lambda expects, e.g.
+  ```json
+  {
+    "StockInsightsFunction": {
+      "ALPHA_VANTAGE_SECRET_ID": "local-dev",
+      "RATE_LIMIT_TABLE": "local-rate-limit",
+      "RATE_LIMIT_DAILY_MAX": 10,
+      "RATE_LIMIT_WINDOW_MS": 86400000,
+      "ALLOWED_ORIGIN": "http://localhost:5173",
+      "API_KEY_CACHE_TTL_MS": 300000
+    }
+  }
+  ```
+- Provide mock implementations (or stubs) for AWS resources if you’re purely local:
+  - Swap `getAlphaVantageKey` to return a test key when `ALPHA_VANTAGE_SECRET_ID` is `local-dev`.
+  - Replace DynamoDB calls with a local implementation (e.g. [DynamoDB Local](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html)) or a simple in-memory store for testing.
+- Point the frontend’s `VITE_API_BASE_URL` to `http://127.0.0.1:3000` (the SAM default) while running the local API.
+- When finished, stop with `Ctrl+C`.
 
 ## Notes
 
