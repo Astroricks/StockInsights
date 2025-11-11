@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Stock Insights Backend
+
+Parameters:
+  AllowedOrigin:
+    Type: String
+    Default: http://localhost:5173
+    Description: Allowed CORS origin for API responses.
+  RateLimitTableName:
+    Type: String
+    Default: local-rate-limit
+    Description: DynamoDB table name for rate limiting state.
+  AlphaVantageApiKey:
+    Type: String
+    Default: ''
+    Description: Alpha Vantage API key.
+  AlphaVantageSecretId:
+    Type: String
+    Default: local-dev
+    Description: Secrets Manager ID (or sentinel) for the Alpha Vantage API key.
+
+Globals:
+  Function:
+    Runtime: nodejs18.x
+    Handler: src/handler.handler
+    MemorySize: 512
+    Timeout: 30
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,OPTIONS,DELETE'"
+      AllowHeaders: "'Content-Type,Authorization,X-User-Id'"
+      AllowOrigin: !Sub "'${AllowedOrigin}'"
+      AllowCredentials: "'true'"
+
+Resources:
+  StockInsightsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: StockInsightsFunction
+      CodeUri: .
+      Runtime: nodejs18.x
+      Handler: src/handler.handler
+      Description: Handles Stock Insights Alpha Vantage proxy requests.
+      Events:
+        Search:
+          Type: Api
+          Properties:
+            Path: /stocks/search
+            Method: post
+        Quota:
+          Type: Api
+          Properties:
+            Path: /quota
+            Method: get
+        CacheClear:
+          Type: Api
+          Properties:
+            Path: /cache
+            Method: delete
+        OptionsProxy:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: options
+      Environment:
+        Variables:
+          ALLOWED_ORIGIN: !Ref AllowedOrigin
+          RATE_LIMIT_TABLE: !Ref RateLimitTableName
+          ALPHA_VANTAGE_API_KEY: !Ref AlphaVantageApiKey
+          ALPHA_VANTAGE_SECRET_ID: !Ref AlphaVantageSecretId
+          RATE_LIMIT_DAILY_MAX: 10
+          RATE_LIMIT_WINDOW_MS: 86400000
+          API_KEY_CACHE_TTL_MS: 300000
+          ALLOW_ANONYMOUS_LOCAL: 'false'
+
+Outputs:
+  ApiUrl:
+    Description: Invoke URL for the deployed API
+    Value: !Sub 'https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod'

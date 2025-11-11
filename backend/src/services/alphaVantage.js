@@ -541,7 +541,8 @@ export const fetchDividendHistory = async (symbol) => {
     const data = response.data;
     
     if (data['Error Message']) {
-      throw new Error(`Invalid symbol: ${symbol}`);
+      console.warn(`[fetchAllFinancialData] Dividend fetch failed for ${symbol}:`, data['Error Message']);
+      return [];
     }
     
     if (isRateLimited(data)) {

@@ -4,6 +4,7 @@ import { enforceRateLimit, RateLimitError, getQuota } from './services/rateLimit
 import { errorResponse, jsonResponse, successResponse } from './utils/response.js';
 
 const CACHE_CONTROL_HEADER = { 'Cache-Control': 'public, max-age=300, s-maxage=300' };
+const ALLOW_ANONYMOUS = process.env.ALLOW_ANONYMOUS_LOCAL === 'true';
 
 const getUserId = (event) => {
   const jwtSubject = event.requestContext?.authorizer?.jwt?.claims?.sub;
@@ -14,6 +15,10 @@ const getUserId = (event) => {
 
   const headerUser = event.headers?.['x-user-id'] ?? event.headers?.['X-User-Id'];
   if (headerUser) return headerUser;
+
+  if (ALLOW_ANONYMOUS) {
+    return 'local-user';
+  }
 
   return null;
 };

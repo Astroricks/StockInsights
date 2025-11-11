@@ -4,9 +4,10 @@ const dynamoClient = new DynamoDBClient({});
 const RATE_LIMIT_TABLE = process.env.RATE_LIMIT_TABLE;
 const MAX_REQUESTS_PER_WINDOW = Number(process.env.RATE_LIMIT_DAILY_MAX ?? 10);
 const WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS ?? 86_400_000); // 24h
+const RATE_LIMIT_DISABLED = !RATE_LIMIT_TABLE || RATE_LIMIT_TABLE === 'local-rate-limit';
 
-if (!RATE_LIMIT_TABLE) {
-  console.warn('[RateLimiter] RATE_LIMIT_TABLE environment variable is not set. Rate limiting will fail.');
+if (RATE_LIMIT_DISABLED) {
+  console.log('[RateLimiter] Rate limiting disabled (local development mode)');
 }
 
 const now = () => Date.now();
@@ -30,7 +31,7 @@ export class RateLimitError extends Error {
 }
 
 export const getQuota = async (userId) => {
-  if (!RATE_LIMIT_TABLE) {
+  if (RATE_LIMIT_DISABLED) {
     return {
       remaining: MAX_REQUESTS_PER_WINDOW,
       total: MAX_REQUESTS_PER_WINDOW,
@@ -70,7 +71,7 @@ export const enforceRateLimit = async (userId) => {
     throw new RateLimitError('Unauthorized request', { code: 'UNAUTHORIZED' });
   }
 
-  if (!RATE_LIMIT_TABLE) {
+  if (RATE_LIMIT_DISABLED) {
     return {
       remaining: MAX_REQUESTS_PER_WINDOW,
       total: MAX_REQUESTS_PER_WINDOW,

@@ -35,7 +35,7 @@ export const clearCache = () => Promise.resolve();
 
 export const fetchAllFinancialData = async (symbol) => {
   const response = await fetchStockData(symbol);
-  return response.data;
+  return response;
 };
 
 export const fetchRateLimitInfo = async () => {

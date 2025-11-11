@@ -5,6 +5,7 @@ node_modules
 .env.local
 .env.*.local
 *.env
+backend/env.local.json
 
 # Auth0 configuration (contains sensitive credentials)
 src/auth_config.json
