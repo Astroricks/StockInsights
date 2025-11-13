@@ -410,7 +410,7 @@ export const fetchBalanceSheet = async (symbol) => {
         shortTermDebt: parseInt(report.shortTermDebt) || 0,
         longTermDebt: parseInt(report.longTermDebtNoncurrent) || 0,
         totalShareholderEquity: parseInt(report.totalShareholderEquity) || 0,
-        sharesOutstanding: parseFloat(report.commonStockSharesOutstanding) || 0
+        commonStockSharesOutstanding: parseFloat(report.commonStockSharesOutstanding) || 0
       })).reverse(),
       true
     );
@@ -424,7 +424,7 @@ export const fetchBalanceSheet = async (symbol) => {
       shortTermDebt: parseInt(report.shortTermDebt) || 0,
       longTermDebt: parseInt(report.longTermDebtNoncurrent) || 0,
       totalShareholderEquity: parseInt(report.totalShareholderEquity) || 0,
-      sharesOutstanding: parseFloat(report.commonStockSharesOutstanding) || 0
+      commonStockSharesOutstanding: parseFloat(report.commonStockSharesOutstanding) || 0
     })).reverse();
 
     const result = {
