@@ -119,9 +119,6 @@ const SettingsModal = ({ isOpen, onClose, onApiKeyUpdate, userId }) => {
                 )}
               </button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Your API key is stored securely in your browser's local storage.
-            </p>
           </div>
 
           {/* Instructions */}
@@ -141,6 +138,18 @@ const SettingsModal = ({ isOpen, onClose, onApiKeyUpdate, userId }) => {
               >
                 Get Alpha Vantage Free API Key <ExternalLink className="h-3 w-3" />
               </a>
+            </AlertDescription>
+          </Alert>
+
+          {/* Privacy Disclaimer */}
+          <Alert>
+            <AlertDescription className="text-xs">
+              <p className="font-semibold mb-1">🔒 Privacy & Security</p>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>• Your API key is stored <strong>only</strong> in your browser's local storage</li>
+                <li>• We <strong>do not store</strong> or have access to your API key on our servers</li>
+                <li>• The key is used to make direct calls to Alpha Vantage from your browser</li>
+              </ul>
             </AlertDescription>
           </Alert>
 

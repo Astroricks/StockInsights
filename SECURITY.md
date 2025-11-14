@@ -1,120 +1,193 @@
 # Security Considerations
 
-## Client-Side Rate Limiting
+## Current Architecture Overview
 
-⚠️ **IMPORTANT**: The rate limiting implemented in this application is **client-side only** and is **NOT secure**. It is designed for user experience (UX) purposes only, not for actual security enforcement.
+This application uses a **user-provided API key** model where each user supplies their own Alpha Vantage API key, which is:
+- Stored in browser `localStorage` (user-specific, tied to Auth0 user ID)
+- Used directly from the frontend to call Alpha Vantage APIs
+- Not shared between users
+- Not stored on any backend server
 
-### What Client-Side Rate Limiting Does
+## Security Model
 
-The current implementation:
-- Provides user feedback about rate limits
-- Prevents accidental excessive API usage through the UI
-- Helps users understand their usage limits
-- Improves UX by showing clear error messages
+### ✅ What IS Secure
 
-### Security Limitations
+1. **User Isolation**
+   - Each user's API key is stored separately using their Auth0 user ID as the key
+   - Switching users automatically loads the correct API key
+   - No API key sharing between users
 
-**Client-side rate limiting can be easily bypassed by:**
+2. **Authentication**
+   - Auth0 provides secure user authentication
+   - JWT tokens for session management
+   - Industry-standard OAuth 2.0 / OpenID Connect
 
-1. **Clearing localStorage**: Users can clear their browser's localStorage to reset rate limit counters
-2. **Modifying JavaScript**: Users can modify the client-side code to bypass checks
-3. **Browser DevTools**: Users can manipulate localStorage or modify variables in the console
-4. **Direct API Calls**: Users can make direct API calls to Alpha Vantage, bypassing the application entirely
-5. **Multiple Browsers/Devices**: Users can use different browsers or devices to bypass limits
-6. **Incognito/Private Mode**: Users can use private browsing to reset localStorage
+3. **HTTPS**
+   - All API calls to Alpha Vantage use HTTPS
+   - Auth0 communication is encrypted
+   - Production deployment should use HTTPS
 
-### True Rate Limiting Requires Server-Side Implementation
+4. **No Backend API Key Storage**
+   - Backend doesn't store or manage user API keys
+   - No risk of centralized API key theft
+   - Users are responsible for their own keys
 
-For **actual security and enforcement**, you must implement rate limiting on the server side:
+### ⚠️ Security Limitations
 
-1. **Backend API Proxy**: Create a backend API that proxies requests to Alpha Vantage
-2. **Server-Side Rate Limiting**: Implement rate limiting logic on the server using:
-   - Database (PostgreSQL, MongoDB, etc.) to track user requests
-   - Redis for fast rate limit checks
-   - Rate limiting libraries (e.g., `express-rate-limit`, `rate-limiter-flexible`)
-3. **Authentication Verification**: Verify Auth0 tokens on the server to ensure requests are from authenticated users
-4. **API Key Protection**: Keep the Alpha Vantage API key on the server, never expose it to the client
+1. **localStorage is Not Encrypted**
+   - API keys are stored in plain text in `localStorage`
+   - Anyone with physical access to the device can read them
+   - Browser extensions can potentially access `localStorage`
+   - **Mitigation**: This is acceptable because:
+     - Alpha Vantage API keys are free
+     - Keys can be rotated easily
+     - Users control their own keys
+     - Rate limits are per-key, limiting potential abuse
 
-### Recommended Architecture
+2. **Client-Side API Calls**
+   - API keys are exposed in browser network traffic
+   - Technically visible in browser DevTools
+   - **Mitigation**: This is the intended design
+     - Alpha Vantage allows client-side calls
+     - Rate limiting is enforced by Alpha Vantage (5 calls/min, 500/day)
+     - Users can monitor their own usage
+
+3. **No Server-Side Rate Limiting**
+   - The application doesn't enforce custom rate limits
+   - Users are subject to Alpha Vantage's own rate limits
+   - **Mitigation**: 
+     - 24-hour cache reduces redundant calls
+     - Alpha Vantage enforces their own limits
+     - Each user is responsible for their own quota
+
+### Backend Security
+
+The backend is **ultra-minimal** and only logs user searches to CloudWatch for analytics:
+
+1. **What the Backend Does**:
+   - Receives search logs (ticker, user ID, user name, user email, timestamp)
+   - Writes structured JSON logs to CloudWatch
+   - Returns immediately (fire-and-forget)
+
+2. **What the Backend Does NOT Do**:
+   - Store or handle API keys
+   - Proxy Alpha Vantage API calls
+   - Enforce rate limiting
+   - Store any user data in databases
+
+3. **Backend Security Measures**:
+   - CORS protection (only allows configured origin)
+   - Minimal attack surface (single logging endpoint)
+   - No database dependencies
+   - Stateless Lambda function
+
+## Best Practices for Users
+
+### For End Users
+
+1. **Protect Your API Key**
+   - Don't share your API key with others
+   - Don't commit your API key to version control
+   - Rotate your key if you suspect it's compromised
+
+2. **Monitor Your Usage**
+   - Check Alpha Vantage dashboard for usage stats
+   - Be aware of the 5 calls/min, 500 calls/day limits
+   - Use cached data when available (24-hour cache)
+
+3. **Secure Your Device**
+   - Use device passwords/biometrics
+   - Be cautious on shared computers
+   - Log out when done on public devices
+
+### For Developers/Admins
+
+1. **Auth0 Configuration**
+   - Keep `auth_config.json` out of version control (`.gitignore`)
+   - Use environment variables for production secrets
+   - Configure proper callback URLs
+   - Enable MFA for Auth0 dashboard access
+
+2. **Production Deployment**
+   - Deploy frontend on HTTPS-only
+   - Configure CORS properly in backend
+   - Use AWS IAM roles for Lambda execution
+   - Enable CloudWatch Logs encryption
+
+3. **Monitoring**
+   - Monitor CloudWatch logs for unusual patterns
+   - Set up alerts for backend errors
+   - Track user search patterns for abuse
+
+## Sensitive Files (Must Not Commit)
+
+These files contain sensitive information and must be excluded from version control:
 
 ```
-┌─────────────┐         ┌──────────────┐         ┌─────────────────┐
-│   Client    │────────>│   Backend    │────────>│ Alpha Vantage   │
-│  (React)    │         │   API        │         │     API         │
-└─────────────┘         └──────────────┘         └─────────────────┘
-                              │
-                              │
-                        ┌─────┴─────┐
-                        │  Database │
-                        │  / Redis  │
-                        └───────────┘
+src/auth_config.json          # Auth0 credentials
+.env                          # Frontend environment variables
+.env.local                    # Local development overrides
+backend/env.local.json        # Backend local development config
 ```
 
-### Implementation Steps for Server-Side Rate Limiting
+Verify they're in `.gitignore`:
+```bash
+grep -E "(auth_config\.json|\.env)" .gitignore
+```
 
-1. **Create Backend API**:
-   - Node.js/Express, Python/Flask, or any backend framework
-   - Endpoint: `POST /api/search` or `GET /api/stock/:ticker`
-   - Verify Auth0 JWT tokens
-   - Check rate limits in database/Redis
-   - Proxy requests to Alpha Vantage with server-side API key
+## Threat Model
 
-2. **Rate Limiting Logic**:
-   ```javascript
-   // Example using express-rate-limit
-   const rateLimit = require('express-rate-limit');
-   
-   const searchLimiter = rateLimit({
-     windowMs: 60 * 1000, // 1 minute
-     max: 1, // 1 request per minute
-     keyGenerator: (req) => req.user.sub, // Auth0 user ID
-     message: 'Rate limit: 1 search per minute'
-   });
-   
-   const dailyLimiter = rateLimit({
-     windowMs: 24 * 60 * 60 * 1000, // 24 hours
-     max: 10, // 10 requests per 24 hours
-     keyGenerator: (req) => req.user.sub,
-     message: 'Quota limit: 10 searches per 24 hours'
-   });
-   ```
+### Low Risk
 
-3. **Update Client**:
-   - Remove direct Alpha Vantage API calls
-   - Call your backend API instead
-   - Backend handles API key and rate limiting
+- **API Key Theft from localStorage**: Free keys, easy to rotate, limited impact
+- **Excessive API Usage**: Alpha Vantage enforces their own limits
+- **Search Log Exposure**: Logs contain no sensitive financial data
 
-### Current Implementation Status
+### Medium Risk
 
-✅ **Implemented (Client-Side)**:
-- Rate limiting UI feedback
-- Per-minute limit checks (1 search/minute)
-- Daily quota tracking (10 searches/24 hours)
-- User-specific tracking using Auth0 user ID
+- **Auth0 Configuration Exposure**: Could allow unauthorized access
+- **CORS Misconfiguration**: Could expose backend to unauthorized domains
+- **CloudWatch Log Data**: Contains user emails/names (PII)
 
-❌ **Not Implemented (Server-Side)**:
-- Server-side rate limit enforcement
-- API key protection
-- True security against bypass attempts
+### Mitigations
 
-### Best Practices
+1. **Never commit `auth_config.json`** to version control
+2. **Configure backend `ALLOWED_ORIGIN`** to production domain only
+3. **Enable CloudWatch Logs encryption** at rest
+4. **Set log retention policies** to comply with privacy regulations
 
-1. **For Production**: Always implement server-side rate limiting
-2. **API Key Security**: Never expose API keys in client-side code
-3. **Authentication**: Verify tokens on the server, not just the client
-4. **Monitoring**: Log all API requests for monitoring and abuse detection
-5. **Error Handling**: Return appropriate error messages without revealing internal details
+## Compliance Considerations
 
-### Additional Security Measures
+### Data Storage
 
-- Use HTTPS for all API calls
-- Implement CORS policies on the backend
-- Add request validation and sanitization
-- Implement logging and monitoring
-- Set up alerts for unusual usage patterns
-- Consider using a API gateway for additional protection
+- **Frontend**: API keys in localStorage (user-controlled)
+- **Backend**: User IDs, names, emails, search queries in CloudWatch Logs
 
-## Conclusion
+### GDPR/Privacy
 
-The current client-side rate limiting provides a good user experience but **does not provide security**. For a production application, you must implement server-side rate limiting to truly enforce usage limits and protect your API keys.
+- Users can clear their API keys by clicking "Remove Key" in settings
+- CloudWatch logs should have retention policies (e.g., 30 days)
+- Consider adding privacy policy and terms of service
 
+### Recommendations
+
+1. Add privacy policy explaining data collection
+2. Implement log retention policies
+3. Provide user data export/deletion mechanisms if required
+4. Consider encrypting CloudWatch logs
+
+## Security Checklist for Production
+
+- [ ] `auth_config.json` excluded from git
+- [ ] Production uses HTTPS
+- [ ] Backend CORS configured to production domain only
+- [ ] CloudWatch Logs encryption enabled
+- [ ] Log retention policy configured
+- [ ] Auth0 application settings reviewed
+- [ ] No hardcoded secrets in code
+- [ ] Environment variables used for all secrets
+- [ ] Regular security audits scheduled
+
+## Reporting Security Issues
+
+If you discover a security vulnerability, please email security@yourcompany.com (replace with your contact) rather than opening a public issue.

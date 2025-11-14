@@ -1,50 +1,88 @@
 # Stock Insights Backend (AWS Lambda)
 
-Serverless backend for the Stock Insights application. Provides secured access to Alpha Vantage data, server-side rate limiting, and usage metrics.
+Ultra-minimal serverless backend for search logging and analytics. This backend **does not** handle API keys, rate limiting, or proxy Alpha Vantage API calls.
 
 ## Architecture
 
-- **API Gateway** – HTTPS entry point, JWT authorizer (Auth0) recommended
-- **AWS Lambda** – Primary compute (this project)
-- **Secrets Manager** – Stores Alpha Vantage API key (`ALPHA_VANTAGE_SECRET_ID`)
-- **DynamoDB** – Enforces per-user rate limits (`RATE_LIMIT_TABLE`)
-- **CloudWatch** – Logs, custom metrics (`METRICS_NAMESPACE`)
-- **(Optional)** API Gateway response caching for result caching (`Cache-Control` headers provided)
+The backend has been deliberately kept minimal:
 
-## Endpoints
+- **API Gateway** – HTTPS entry point with CORS configuration
+- **AWS Lambda** – Single function for logging (this project)
+- **CloudWatch Logs** – Stores structured search logs for analytics
+
+**What this backend does NOT include:**
+- ❌ API key storage or management
+- ❌ Rate limiting
+- ❌ Alpha Vantage API proxying
+- ❌ Caching layer
+
+## API Endpoint
 
 | Method | Path             | Description                                              |
 |--------|------------------|----------------------------------------------------------|
-| POST   | `/stocks/search` | Fetches all financial data for a ticker (rate limited)   |
-| GET    | `/quota`         | Returns remaining quota and next search availability     |
+| POST   | `/stocks/search` | Logs user search to CloudWatch (returns 204 immediately) |
 
 > `OPTIONS` requests are handled automatically for CORS preflight.
 
+### POST /stocks/search
+
+**Request Body:**
+```json
+{
+  "symbol": "AAPL",
+  "userName": "John Doe",
+  "userEmail": "john@example.com"
+}
+```
+
+**Response:**
+- Status: `204 No Content`
+- Body: (empty)
+- Behavior: Fire-and-forget logging, returns immediately
+
+**Logged Data (CloudWatch):**
+```json
+{
+  "event": "stock_search",
+  "userId": "auth0|123456789",
+  "userName": "John Doe",
+  "userEmail": "john@example.com",
+  "symbol": "AAPL",
+  "timestamp": "2025-11-14T10:30:45.123Z",
+  "requestId": "abc-123-def-456"
+}
+```
+
 ## Environment Variables
 
-| Name                         | Description                                                  |
-|------------------------------|--------------------------------------------------------------|
-| `ALPHA_VANTAGE_SECRET_ID`    | Secrets Manager secret ID containing the API key (required)  |
-| `RATE_LIMIT_TABLE`           | DynamoDB table name for rate-limiting state (required)       |
-| `METRICS_NAMESPACE`          | CloudWatch metrics namespace (default: `StockInsights/Usage`)|
-| `RATE_LIMIT_DAILY_MAX`       | Max unique tickers per 24h (default: `10`)                   |
-| `RATE_LIMIT_WINDOW_MS`       | Rolling window duration (default: `86400000`)                |
-| `ALLOWED_ORIGIN`             | CORS origin (default: `*`)                                   |
-| `SECRET_CACHE_TTL_MS`        | Secrets Manager cache TTL (default: `300000`)                |
+| Name             | Description                                    | Required |
+|------------------|------------------------------------------------|----------|
+| `ALLOWED_ORIGIN` | CORS origin (e.g., `https://your-domain.com`) | Yes      |
 
-Additional (optional):
-- `METRICS_NAMESPACE` – only needed if you decide to emit custom CloudWatch metrics later.
+**Example:**
+```bash
+ALLOWED_ORIGIN=https://prismfin.example.com
+```
 
-### DynamoDB Table Schema (`RATE_LIMIT_TABLE`)
+For local development:
+```json
+// env.local.json
+{
+  "StockInsightsFunction": {
+    "ALLOWED_ORIGIN": "http://localhost:5173"
+  }
+}
+```
 
-- **Partition key**: `userId` (string)
-- Attributes:
-  - `windowStart` (number)
-  - `requestCount24h` (number)
-  - `lastRequestTimestamp` (number)
-  - `updatedAt` (number)
+## Deployment
 
-## Deployment (example using SAM)
+### Prerequisites
+
+1. [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html) installed
+2. AWS credentials configured (`aws configure`)
+3. Node.js 18+ and pnpm installed
+
+### Steps
 
 1. **Install dependencies**
    ```bash
@@ -52,82 +90,282 @@ Additional (optional):
    pnpm install
    ```
 
-2. **Package and deploy** *(requires the [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html); install it first if `sam` is not found)*
+2. **Build**
    ```bash
    sam build
+   ```
+
+3. **Deploy**
+   ```bash
    sam deploy --guided
    ```
 
-3. **Configure Secrets Manager**
-   ```bash
-   aws secretsmanager create-secret \
-     --name StockInsightsAlphaVantage \
-     --secret-string '{"API_KEY":"YOUR_ALPHA_VANTAGE_KEY"}'
+   During guided deployment, you'll be asked:
+   - Stack name (e.g., `stock-insights-backend`)
+   - AWS Region (e.g., `us-east-1`)
+   - `AllowedOrigin` parameter (e.g., `https://your-frontend-domain.com`)
+   - Confirm IAM role creation
+   - Allow SAM CLI to save configuration
+
+4. **Get API URL**
+   After deployment, note the `ApiUrl` output:
+   ```
+   Outputs:
+     ApiUrl: https://abc123.execute-api.us-east-1.amazonaws.com/Prod
+     LogGroup: /aws/lambda/StockInsightsFunction
    ```
 
-4. **Create DynamoDB table**
+5. **Update Frontend**
+   Set the API URL in your frontend `.env` file:
    ```bash
-   aws dynamodb create-table \
-     --table-name StockInsightsRateLimit \
-     --attribute-definitions AttributeName=userId,AttributeType=S \
-     --key-schema AttributeName=userId,KeyType=HASH \
-     --billing-mode PAY_PER_REQUEST
+   VITE_API_BASE_URL=https://abc123.execute-api.us-east-1.amazonaws.com/Prod
    ```
 
-5. **Set environment variables** (example)
-   ```bash
-   aws lambda update-function-configuration \
-     --function-name stock-insights-backend \
-     --environment "Variables={\
-ALPHA_VANTAGE_SECRET_ID=StockInsightsAlphaVantage,\
-RATE_LIMIT_TABLE=StockInsightsRateLimit,\
-METRICS_NAMESPACE=StockInsights/Usage,\
-ALLOWED_ORIGIN=https://your-frontend-domain\
-}"
-   ```
+### Updating Deployment
+
+After making code changes:
+
+```bash
+sam build && sam deploy
+```
+
+### Deleting Stack
+
+To remove all resources:
+
+```bash
+sam delete --stack-name stock-insights-backend
+```
 
 ## Local Testing
 
-You can run the handler locally by simulating an event:
+### Start Local API Server
 
 ```bash
-node --loader ts-node/esm scripts/invoke-local.mjs
+sam local start-api --env-vars env.local.json
 ```
 
-Or use tools like [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli.html) (`sam local invoke`) / [Serverless Framework](https://www.serverless.com/framework/docs/providers/aws/cli-reference/invoke-local/).
+This starts a local server at `http://127.0.0.1:3000`.
 
-### Local API Development with SAM
-
-To spin up the API locally and point your frontend at it:
-
-```bash
-sam local start-api \
-  --env-vars env.local.json
-```
-
-- Create an `env.local.json` file with the environment variables your Lambda expects, e.g.
-  ```json
-  {
-    "StockInsightsFunction": {
-      "ALPHA_VANTAGE_SECRET_ID": "local-dev",
-      "RATE_LIMIT_TABLE": "local-rate-limit",
-      "RATE_LIMIT_DAILY_MAX": 10,
-      "RATE_LIMIT_WINDOW_MS": 86400000,
-      "ALLOWED_ORIGIN": "http://localhost:5173",
-      "API_KEY_CACHE_TTL_MS": 300000
-    }
+**Create `env.local.json`:**
+```json
+{
+  "StockInsightsFunction": {
+    "ALLOWED_ORIGIN": "http://localhost:5173"
   }
-  ```
-- Provide mock implementations (or stubs) for AWS resources if you’re purely local:
-  - Swap `getAlphaVantageKey` to return a test key when `ALPHA_VANTAGE_SECRET_ID` is `local-dev`.
-  - Replace DynamoDB calls with a local implementation (e.g. [DynamoDB Local](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html)) or a simple in-memory store for testing.
-- Point the frontend’s `VITE_API_BASE_URL` to `http://127.0.0.1:3000` (the SAM default) while running the local API.
-- When finished, stop with `Ctrl+C`.
+}
+```
 
-## Notes
+**Update Frontend for Local Development:**
+```bash
+# In frontend .env.local
+VITE_API_BASE_URL=http://127.0.0.1:3000
+```
 
-- Alpha Vantage responses are cached in-memory within the Lambda execution context for ~30 minutes.
-- Responses include `Cache-Control` headers so API Gateway caching can be enabled.
-- CloudWatch logs capture per-search context (user, ticker, duration, success/failure). Metrics are not emitted by default.
-- Rate-limit errors return `429` with structured JSON detailing retry timing and remaining quota.
+### Test the Endpoint
 
+```bash
+curl -X POST http://127.0.0.1:3000/stocks/search \
+  -H "Content-Type: application/json" \
+  -H "X-User-Id: test-user" \
+  -d '{"symbol":"AAPL","userName":"Test User","userEmail":"test@example.com"}'
+```
+
+Expected response: `204 No Content`
+
+Check logs:
+```bash
+# Logs appear in the terminal where you ran sam local start-api
+```
+
+## Viewing Logs in Production
+
+### CloudWatch Logs
+
+1. Open AWS Console → CloudWatch → Log Groups
+2. Find `/aws/lambda/StockInsightsFunction`
+3. View log streams
+
+### Query Logs with CloudWatch Insights
+
+```sql
+fields @timestamp, userId, userName, userEmail, symbol
+| filter event = "stock_search"
+| sort @timestamp desc
+| limit 100
+```
+
+**Popular queries:**
+
+Most searched stocks:
+```sql
+fields symbol, count(*) as searchCount
+| filter event = "stock_search"
+| stats count(*) by symbol
+| sort searchCount desc
+| limit 10
+```
+
+Most active users:
+```sql
+fields userName, count(*) as searches
+| filter event = "stock_search"
+| stats count(*) by userName
+| sort searches desc
+| limit 10
+```
+
+Searches by time:
+```sql
+fields @timestamp, userName, symbol
+| filter event = "stock_search"
+| sort @timestamp desc
+```
+
+## IAM Permissions
+
+The Lambda function requires minimal permissions:
+
+```yaml
+Policies:
+  - AWSLambdaBasicExecutionRole  # CloudWatch Logs only
+```
+
+**What permissions are needed:**
+- `logs:CreateLogGroup`
+- `logs:CreateLogStream`
+- `logs:PutLogEvents`
+
+## Cost Estimates
+
+This backend is **extremely cost-effective**:
+
+### AWS Lambda
+- **Free Tier**: 1M requests/month, 400,000 GB-seconds/month
+- **After Free Tier**: $0.20 per 1M requests
+- **Memory**: 128 MB (minimal)
+- **Typical cost**: ~$0.00 for most usage
+
+### API Gateway
+- **Free Tier**: 1M API calls/month (first 12 months)
+- **After Free Tier**: $3.50 per million requests
+- **Typical cost**: <$1/month for moderate usage
+
+### CloudWatch Logs
+- **Ingestion**: $0.50 per GB
+- **Storage**: $0.03 per GB/month
+- **Typical cost**: <$0.10/month for logs
+
+**Total monthly cost for 10,000 searches**: < $0.50
+
+## Architecture Decisions
+
+### Why So Minimal?
+
+1. **User-Provided API Keys**: Users manage their own Alpha Vantage API keys, so no proxying needed
+2. **Alpha Vantage Rate Limits**: Alpha Vantage enforces their own limits (5/min, 500/day)
+3. **Client-Side Caching**: 24-hour cache in browser reduces redundant calls
+4. **Cost Optimization**: No DynamoDB, no Secrets Manager = minimal AWS costs
+5. **Simplicity**: Easy to understand, deploy, and maintain
+
+### Alternative: Full-Featured Backend
+
+For a production application requiring strict rate limiting, you might want:
+- DynamoDB for rate limiting state
+- Secrets Manager for shared API keys
+- Backend proxying of Alpha Vantage calls
+- Server-side caching (Redis/ElastiCache)
+
+However, this significantly increases complexity and cost. The current architecture is ideal for:
+- Personal projects
+- Small user bases
+- Cost-sensitive applications
+- When users can manage their own API keys
+
+## Troubleshooting
+
+### CORS Errors
+
+**Problem:** Frontend shows CORS errors when calling backend
+
+**Solution:**
+1. Verify `ALLOWED_ORIGIN` matches your frontend URL exactly
+2. Include protocol (https://) in `ALLOWED_ORIGIN`
+3. Don't add trailing slash to `ALLOWED_ORIGIN`
+4. Redeploy after changing: `sam build && sam deploy`
+
+### 401 Unauthorized
+
+**Problem:** Backend returns 401 for all requests
+
+**Solution:**
+1. Ensure frontend passes `X-User-Id` header (or Auth0 JWT)
+2. For local testing, pass `X-User-Id` header manually
+3. Check CloudWatch Logs for "unauthorized_search_attempt" events
+
+### Logs Not Appearing
+
+**Problem:** Searches work but logs don't appear in CloudWatch
+
+**Solution:**
+1. Wait a few minutes (CloudWatch can have slight delay)
+2. Check Lambda execution role has CloudWatch Logs permissions
+3. View Lambda function logs directly in AWS Console
+4. Ensure `console.log()` statements are present in handler
+
+### High Latency
+
+**Problem:** Backend responses are slow
+
+**Solution:**
+1. The backend returns 204 immediately (should be <100ms)
+2. Check API Gateway CloudWatch metrics
+3. Consider using VPC if network isolation is required
+4. Cold starts are minimal (128 MB memory, simple function)
+
+## Monitoring
+
+### Key Metrics to Watch
+
+1. **Invocations**: Total number of searches logged
+2. **Errors**: Should be near zero
+3. **Duration**: Should be <100ms (fire-and-forget logging)
+4. **Throttles**: Should be zero (no rate limiting)
+
+### Setting Up Alarms
+
+```bash
+aws cloudwatch put-metric-alarm \
+  --alarm-name stock-insights-errors \
+  --alarm-description "Alert on Lambda errors" \
+  --metric-name Errors \
+  --namespace AWS/Lambda \
+  --statistic Sum \
+  --period 300 \
+  --threshold 5 \
+  --comparison-operator GreaterThanThreshold \
+  --evaluation-periods 1 \
+  --dimensions Name=FunctionName,Value=StockInsightsFunction
+```
+
+## Security
+
+See [SECURITY.md](../SECURITY.md) for detailed security considerations.
+
+**Quick checklist:**
+- [ ] `ALLOWED_ORIGIN` set to production domain only
+- [ ] CloudWatch Logs encryption enabled (optional)
+- [ ] Log retention policy configured (e.g., 30 days)
+- [ ] IAM role follows least privilege principle
+
+## Support
+
+For issues or questions:
+1. Check CloudWatch Logs for error details
+2. Verify environment variables are set correctly
+3. Test with `curl` to isolate frontend vs backend issues
+4. Review [main README](../README.md) for overall architecture
+
+## License
+
+See [LICENSE](../LICENSE) for details.

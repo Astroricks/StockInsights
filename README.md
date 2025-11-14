@@ -301,6 +301,7 @@ import { clearCache, getCacheInfo } from './utils/fetchAlphaVantage';
 
 ### Usage Strategy
 - **Use your own API key** - each user has their own quota
+- **24-hour cache** - dramatically reduces API usage
 - **No backend rate limiting** - managed entirely by Alpha Vantage
 - **Cache persists for 24 minutes** - revisit stocks without new API calls
 - **Monitor usage** through Alpha Vantage dashboard (if available)
