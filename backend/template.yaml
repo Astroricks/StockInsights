@@ -44,7 +44,6 @@ Resources:
       Environment:
         Variables:
           ALLOWED_ORIGIN: !Ref AllowedOrigin
-          ALLOW_ANONYMOUS_LOCAL: 'true'
 
 Outputs:
   ApiUrl:

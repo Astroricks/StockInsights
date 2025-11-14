@@ -1,7 +1,5 @@
 import { errorResponse } from './utils/response.js';
 
-const ALLOW_ANONYMOUS = process.env.ALLOW_ANONYMOUS_LOCAL === 'true';
-
 const getUserId = (event) => {
   const jwtSubject = event.requestContext?.authorizer?.jwt?.claims?.sub;
   if (jwtSubject) return jwtSubject;
@@ -11,10 +9,6 @@ const getUserId = (event) => {
 
   const headerUser = event.headers?.['x-user-id'] ?? event.headers?.['X-User-Id'];
   if (headerUser) return headerUser;
-
-  if (ALLOW_ANONYMOUS) {
-    return 'local-user';
-  }
 
   return null;
 };

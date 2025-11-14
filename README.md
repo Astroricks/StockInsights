@@ -152,7 +152,6 @@ VITE_API_BASE_URL=https://your-api-gateway-id.execute-api.region.amazonaws.com/P
 Backend (Lambda):
 
 - `ALLOWED_ORIGIN` – Allowed CORS origin (e.g., your frontend domain)
-- `ALLOW_ANONYMOUS_LOCAL` – Set to 'true' for local development
 
 ### API Overview
 
