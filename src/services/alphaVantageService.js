@@ -146,7 +146,8 @@ const callAlphaVantage = async (params) => {
   }
 
   if (data['Note'] || data['Information']) {
-    throw new Error('API rate limit exceeded. Please try again in a moment.');
+    const errorMessage = data['Note'] || data['Information'];
+    throw new Error(`Alpha Vantage API Error: ${errorMessage}`);
   }
 
   return data;

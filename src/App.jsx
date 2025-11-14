@@ -125,6 +125,13 @@ function App() {
 
       // Fetch data from Alpha Vantage
       const data = await fetchAllFinancialData(normalizedTicker);
+      
+      // Filter historical data based on current timeframe
+      if (data.historicalData && data.originalHistoricalData) {
+        const filteredData = filterHistoricalData(data.originalHistoricalData, timeframe);
+        data.historicalData = filteredData;
+      }
+      
       setFinancialData(data);
     } catch (fetchError) {
       console.error('Error fetching data:', fetchError);
