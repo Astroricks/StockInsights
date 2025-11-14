@@ -74,15 +74,16 @@ function App() {
     setError(null);
 
     const normalizedTicker = ticker.trim().toUpperCase();
+    const isDemo = normalizedTicker === 'IBM';
 
-    // Check if user is authenticated
-    if (!isAuthenticated) {
-      setError('Please sign in to search for stocks.');
+    // Allow IBM demo for everyone, require auth for other stocks
+    if (!isDemo && !isAuthenticated) {
+      setError('Please sign in to search for stocks other than IBM (demo).');
       return;
     }
 
-    // Check if API key is configured
-    if (!apiKeyConfigured) {
+    // For non-IBM stocks, check if API key is configured
+    if (!isDemo && !apiKeyConfigured) {
       setError('Please configure your Alpha Vantage API key in Settings.');
       setShowSettings(true);
       return;
@@ -93,8 +94,15 @@ function App() {
       setSearchTicker(normalizedTicker);
       setLoading(true);
 
-      // Fire-and-forget: log search to backend
-      logSearch(normalizedTicker);
+      // For IBM, use 'demo' key if user doesn't have their own
+      if (isDemo && !apiKeyConfigured) {
+        setAlphaVantageApiKey('demo');
+      }
+
+      // Fire-and-forget: log search to backend (only for authenticated users)
+      if (isAuthenticated) {
+        logSearch(normalizedTicker);
+      }
 
       // Fetch data from Alpha Vantage
       const data = await fetchAllFinancialData(normalizedTicker);
@@ -210,7 +218,7 @@ function App() {
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                 <span className="text-blue-800 dark:text-blue-200">
-                  <strong>Sign In Required:</strong> Sign in with your account and configure your free Alpha Vantage API key to search stocks.
+                  <strong>Try IBM Demo:</strong> Search "IBM" to see the app in action! Sign in and add your free Alpha Vantage API key to search other stocks.
                 </span>
               </div>
             </div>
@@ -226,7 +234,9 @@ function App() {
             <form onSubmit={handleSubmit} className="flex gap-2">
               <Input
                 type="text"
-                placeholder="Enter stock ticker (e.g., IBM, AAPL, GOOGL, MSFT)"
+                placeholder={isAuthenticated && apiKeyConfigured 
+                  ? "Enter stock ticker (e.g., AAPL, GOOGL, MSFT)" 
+                  : "Enter stock ticker (try IBM demo)"}
                 value={searchTicker}
                 onChange={(e) => setSearchTicker(e.target.value.toUpperCase())}
                 className="w-full md:w-64"
@@ -234,7 +244,7 @@ function App() {
               />
               <Button 
                 type="submit" 
-                disabled={loading || authLoading || !searchTicker.trim() || !isAuthenticated || !apiKeyConfigured}
+                disabled={loading || authLoading || !searchTicker.trim()}
                 className="px-6"
               >
                 <Search className="h-4 w-4 mr-2" />
@@ -389,33 +399,32 @@ function App() {
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               Enter a stock ticker symbol above to get comprehensive financial insights including 
               revenue, EBITDA, cash flow, and more.
-              {!isAuthenticated && (
-                <span className="block mt-2 text-sm text-orange-600 dark:text-orange-400">
-                  Sign in and configure your Alpha Vantage API key to get started.
-                </span>
-              )}
-              {isAuthenticated && !apiKeyConfigured && (
-                <span className="block mt-2 text-sm text-orange-600 dark:text-orange-400">
-                  Configure your Alpha Vantage API key in Settings to get started.
-                </span>
-              )}
             </p>
+            
+            {/* IBM Demo - Always Available */}
+            <div className="text-sm text-muted-foreground mb-8">
+              <p className="mb-2 font-semibold text-lg text-foreground">Try the Demo Stock:</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <StockButton
+                  ticker="IBM"
+                  onSearch={handleSearch}
+                  disabled={loading || authLoading}
+                />
+              </div>
+            </div>
+
+            {/* Other Stocks */}
             <div className="text-sm text-muted-foreground">
               <p className="mb-2">
                 Popular stocks to try:{' '}
-                {!isAuthenticated && (
+                {(!isAuthenticated || !apiKeyConfigured) && (
                   <span className="text-orange-600 dark:text-orange-400 font-medium">
-                    (Sign in required)
-                  </span>
-                )}
-                {isAuthenticated && !apiKeyConfigured && (
-                  <span className="text-orange-600 dark:text-orange-400 font-medium">
-                    (API key required)
+                    (Sign in + API key required)
                   </span>
                 )}
               </p>
               <div className="flex flex-wrap justify-center gap-2">
-                {['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META', 'IBM'].map((ticker) => (
+                {['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META'].map((ticker) => (
                   <StockButton
                     key={ticker}
                     ticker={ticker}
