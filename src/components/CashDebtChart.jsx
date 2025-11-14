@@ -30,14 +30,21 @@ const CashDebtChart = ({ data, timeframe = 'Quarterly' }) => {
   }
 
   // Format data for chart
-  const chartData = sourceData.map(item => ({
-    date: item.date || item.calendarYear,
-    quarter: formatTimeframeLabel(item.date, isAnnual),
-    cash: (item.cash || item.cashAndCashEquivalents || 0) / 1000000000, // Convert to billions
-    debt: (item.totalDebt || item.totalLiabilities || 0) / 1000000000, // Convert to billions
-    rawCash: item.cash || item.cashAndCashEquivalents || 0,
-    rawDebt: item.totalDebt || item.totalLiabilities || 0
-  })).filter(item => item.rawCash > 0 || item.rawDebt > 0);
+  const chartData = sourceData.map(item => {
+    const cash = item.cash || item.cashAndCashEquivalents || 0;
+    const totalDebt = (item.shortTermDebt || 0) + (item.longTermDebt || 0);
+    
+    return {
+      date: item.date || item.calendarYear,
+      quarter: formatTimeframeLabel(item.date, isAnnual),
+      cash: cash / 1000000000, // Convert to billions
+      debt: totalDebt / 1000000000, // Convert to billions
+      rawCash: cash,
+      rawDebt: totalDebt,
+      shortTermDebt: (item.shortTermDebt || 0) / 1000000000,
+      longTermDebt: (item.longTermDebt || 0) / 1000000000
+    };
+  }).filter(item => item.rawCash > 0 || item.rawDebt > 0);
 
   // Calculate metrics
   const latestData = chartData[chartData.length - 1];
@@ -55,8 +62,18 @@ const CashDebtChart = ({ data, timeframe = 'Quarterly' }) => {
             Cash: ${data.cash.toFixed(2)}B
           </p>
           <p className="text-sm text-red-600">
-            Debt: ${data.debt.toFixed(2)}B
+            Total Debt: ${data.debt.toFixed(2)}B
           </p>
+          {data.shortTermDebt > 0 && (
+            <p className="text-xs text-muted-foreground ml-2">
+              Short-term: ${data.shortTermDebt.toFixed(2)}B
+            </p>
+          )}
+          {data.longTermDebt > 0 && (
+            <p className="text-xs text-muted-foreground ml-2">
+              Long-term: ${data.longTermDebt.toFixed(2)}B
+            </p>
+          )}
           <p className="text-sm text-muted-foreground">
             Net: ${(data.cash - data.debt).toFixed(2)}B
           </p>
