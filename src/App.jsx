@@ -94,9 +94,16 @@ function App() {
       setSearchTicker(normalizedTicker);
       setLoading(true);
 
-      // For IBM, use 'demo' key if user doesn't have their own
+      // Ensure API key is set before fetching
       if (isDemo && !apiKeyConfigured) {
+        // For IBM demo, directly set and use 'demo' key
         setAlphaVantageApiKey('demo');
+      } else if (apiKeyConfigured) {
+        // Reload user's key from localStorage to ensure it's available
+        const userKey = loadApiKey();
+        if (userKey) {
+          setAlphaVantageApiKey(userKey);
+        }
       }
 
       // Fire-and-forget: log search to backend (only for authenticated users)

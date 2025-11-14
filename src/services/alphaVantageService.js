@@ -83,6 +83,14 @@ const setCachedData = (symbol, endpoint, data) => {
 
 // API call wrapper
 const callAlphaVantage = async (params) => {
+  // Try to load API key from localStorage if not already set
+  if (!API_KEY) {
+    const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+    if (storedKey) {
+      API_KEY = storedKey;
+    }
+  }
+
   if (!API_KEY) {
     throw new Error('API key not configured. Please set your Alpha Vantage API key.');
   }
@@ -369,13 +377,36 @@ export const fetchDividendHistory = async (symbol) => {
 
     const dividends = data.data || [];
     
+    // Process quarterly dividends
+    const quarterly = dividends.slice(0, 40).reverse().map(div => ({
+      date: div.ex_dividend_date || div.payment_date,
+      dividendAmount: parseFloat(div.amount) || 0,
+      declarationDate: div.declaration_date
+    }));
+
+    // Aggregate quarterly into annual
+    const annualMap = new Map();
+    dividends.forEach(div => {
+      const date = div.ex_dividend_date || div.payment_date;
+      if (date) {
+        const year = new Date(date).getFullYear();
+        if (!annualMap.has(year)) {
+          annualMap.set(year, { year, totalDividend: 0, dividendCount: 0 });
+        }
+        const yearData = annualMap.get(year);
+        yearData.totalDividend += parseFloat(div.amount) || 0;
+        yearData.dividendCount += 1;
+      }
+    });
+
+    // Convert to array and sort by year (oldest to newest)
+    const annual = Array.from(annualMap.values())
+      .sort((a, b) => a.year - b.year)
+      .slice(-20); // Keep last 20 years
+    
     const result = {
-      annual: [],
-      quarterly: dividends.slice(0, 40).reverse().map(div => ({
-        date: div.exDividendDate || div.paymentDate,
-        dividendAmount: parseFloat(div.amount) || 0,
-        declarationDate: div.declarationDate
-      }))
+      annual,
+      quarterly
     };
 
     setCachedData(symbol, 'dividends', result);
