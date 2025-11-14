@@ -302,7 +302,7 @@ function App() {
               size="sm"
               onClick={() => handleTimeframeChange('annual')}
             >
-              Annual
+              Annually
             </Button>
           </div>
         </div>

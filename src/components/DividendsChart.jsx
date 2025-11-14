@@ -28,7 +28,17 @@ const DividendsChart = ({ data, timeframe = 'Quarterly' }) => {
 
   // Use annual or quarterly data based on timeframe
   const isAnnual = timeframe.toLowerCase().includes('annual');
-  const sourceData = isAnnual ? (data.annual || []) : (data.quarterly || []);
+  let sourceData = isAnnual ? (data.annual || []) : (data.quarterly || []);
+
+  // Filter quarterly data to last 5 years (20 quarters)
+  if (!isAnnual && sourceData.length > 0) {
+    const cutoffDate = new Date();
+    cutoffDate.setFullYear(cutoffDate.getFullYear() - 5);
+    sourceData = sourceData.filter(item => {
+      const itemDate = new Date(item.date);
+      return itemDate >= cutoffDate;
+    });
+  }
 
   // Format data for chart
   const chartData = sourceData.map(item => {
