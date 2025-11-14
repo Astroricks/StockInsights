@@ -1,46 +1,22 @@
-import { fetchQuota, fetchStockData, filterHistoricalData as filterHistoricalDataInternal } from '@/api/stockService';
+// Re-export all functions from the new Alpha Vantage service
+export {
+  setApiKey,
+  fetchAllFinancialData,
+  filterHistoricalData,
+  formatTimeframeLabel,
+  clearCache
+} from '../services/alphaVantageService';
 
-export const formatTimeframeLabel = (dateString, isAnnual = false) => {
-  if (!dateString) return 'Unknown';
-  const parsed = new Date(dateString);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return dateString;
-  }
-
-  const year = parsed.getFullYear();
-
-  if (isAnnual) {
-    return `FY ${year}`;
-  }
-
-  const quarter = Math.floor(parsed.getMonth() / 3) + 1;
-  return `Q${quarter} ${year}`;
-};
-
+// Legacy compatibility exports
 export const initializeApiKey = () => {
-  // Legacy no-op kept for backwards compatibility
+  // No-op for backward compatibility
 };
 
 export const updateApiKey = () => {
-  // Legacy no-op kept for backwards compatibility
+  // No-op for backward compatibility
 };
 
 export const testApiKey = async () => ({
   status: 'deprecated',
-  message: 'API keys are managed server-side.',
+  message: 'API key testing moved to direct Alpha Vantage calls.',
 });
-
-export const clearCache = () => Promise.resolve();
-
-export const fetchAllFinancialData = async (symbol) => {
-  const response = await fetchStockData(symbol);
-  return response;
-};
-
-export const fetchRateLimitInfo = async () => {
-  return fetchQuota();
-};
-
-export const filterHistoricalData = filterHistoricalDataInternal;
-

@@ -1,0 +1,474 @@
+import axios from 'axios';
+
+const ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query';
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const API_KEY_STORAGE_KEY = 'alpha_vantage_api_key';
+
+let API_KEY = null;
+
+// API Key Management (localStorage-based)
+export const saveApiKey = (apiKey) => {
+  if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length === 0) {
+    throw new Error('Valid API key is required');
+  }
+  
+  const trimmedKey = apiKey.trim();
+  localStorage.setItem(API_KEY_STORAGE_KEY, trimmedKey);
+  API_KEY = trimmedKey;
+  return { success: true, message: 'API key saved successfully' };
+};
+
+export const loadApiKey = () => {
+  const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+  if (storedKey) {
+    API_KEY = storedKey;
+    return storedKey;
+  }
+  return null;
+};
+
+export const deleteApiKey = () => {
+  localStorage.removeItem(API_KEY_STORAGE_KEY);
+  API_KEY = null;
+  return { success: true, message: 'API key removed successfully' };
+};
+
+export const hasApiKey = () => {
+  return !!loadApiKey();
+};
+
+// Set API key directly (for backward compatibility)
+export const setApiKey = (apiKey) => {
+  API_KEY = apiKey;
+};
+
+export const getApiKey = () => API_KEY;
+
+// Cache utilities
+const getCacheKey = (symbol, endpoint) => `av_${symbol}_${endpoint}`;
+
+const getCachedData = (symbol, endpoint) => {
+  try {
+    const cacheKey = getCacheKey(symbol, endpoint);
+    const cached = localStorage.getItem(cacheKey);
+    
+    if (!cached) return null;
+
+    const { data, timestamp } = JSON.parse(cached);
+    const now = Date.now();
+    
+    if (now - timestamp < CACHE_DURATION) {
+      return data;
+    }
+    localStorage.removeItem(cacheKey);
+    return null;
+  } catch (error) {
+    console.warn('[AlphaVantage] Cache read error:', error);
+    return null;
+  }
+};
+
+const setCachedData = (symbol, endpoint, data) => {
+  try {
+    const cacheKey = getCacheKey(symbol, endpoint);
+    const cacheData = {
+      data,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+  } catch (error) {
+    console.warn('[AlphaVantage] Cache write error:', error);
+  }
+};
+
+// API call wrapper
+const callAlphaVantage = async (params) => {
+  if (!API_KEY) {
+    throw new Error('API key not configured. Please set your Alpha Vantage API key.');
+  }
+
+  const response = await axios.get(ALPHA_VANTAGE_BASE_URL, {
+    params: {
+      ...params,
+      apikey: API_KEY
+    },
+    timeout: 30000
+  });
+
+  const data = response.data;
+
+  if (data['Error Message']) {
+    throw new Error(`Invalid symbol or request: ${data['Error Message']}`);
+  }
+
+  if (data['Note'] || data['Information']) {
+    throw new Error('API rate limit exceeded. Please try again in a moment.');
+  }
+
+  return data;
+};
+
+// Filter out incomplete current year data
+const filterIncompleteCurrentYear = (data, isAnnual) => {
+  if (!isAnnual || !data || data.length === 0) return data;
+  
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth();
+  
+  if (currentMonth < 3) {
+    return data.filter(item => {
+      const itemYear = new Date(item.date).getFullYear();
+      return itemYear < currentYear;
+    });
+  }
+  
+  return data;
+};
+
+// Fetch historical price data
+export const fetchHistoricalData = async (symbol) => {
+  const cached = getCachedData(symbol, 'historical');
+  if (cached) return cached;
+
+  const data = await callAlphaVantage({
+    function: 'TIME_SERIES_DAILY',
+    symbol: symbol.toUpperCase(),
+    outputsize: 'full'
+  });
+
+  const timeSeries = data['Time Series (Daily)'] || {};
+  const historicalData = Object.entries(timeSeries)
+    .map(([date, values]) => ({
+      date,
+      open: parseFloat(values['1. open']),
+      high: parseFloat(values['2. high']),
+      low: parseFloat(values['3. low']),
+      close: parseFloat(values['4. close']),
+      volume: parseInt(values['5. volume'])
+    }))
+    .reverse();
+
+  setCachedData(symbol, 'historical', historicalData);
+  return historicalData;
+};
+
+// Fetch income statement
+export const fetchIncomeStatement = async (symbol) => {
+  const cached = getCachedData(symbol, 'income');
+  if (cached) return cached;
+
+  const data = await callAlphaVantage({
+    function: 'INCOME_STATEMENT',
+    symbol: symbol.toUpperCase()
+  });
+
+  const annualReports = data.annualReports || [];
+  const quarterlyReports = data.quarterlyReports || [];
+
+  const annualData = filterIncompleteCurrentYear(
+    annualReports.map(report => ({
+      date: report.fiscalDateEnding,
+      period: 'annual',
+      revenue: parseInt(report.totalRevenue) || 0,
+      costOfRevenue: parseInt(report.costOfRevenue) || 0,
+      grossProfit: parseInt(report.grossProfit) || 0,
+      operatingIncome: parseInt(report.operatingIncome) || 0,
+      netIncome: parseInt(report.netIncome) || 0,
+      ebitda: parseInt(report.ebitda) || 0,
+      eps: parseFloat(report.eps) || 0
+    })).reverse(),
+    true
+  );
+
+  const quarterlyData = quarterlyReports.slice(0, 20).map(report => ({
+    date: report.fiscalDateEnding,
+    period: 'quarter',
+    revenue: parseInt(report.totalRevenue) || 0,
+    costOfRevenue: parseInt(report.costOfRevenue) || 0,
+    grossProfit: parseInt(report.grossProfit) || 0,
+    operatingIncome: parseInt(report.operatingIncome) || 0,
+    netIncome: parseInt(report.netIncome) || 0,
+    ebitda: parseInt(report.ebitda) || 0,
+    eps: parseFloat(report.eps) || 0
+  })).reverse();
+
+  const result = {
+    annual: annualData,
+    quarterly: quarterlyData
+  };
+
+  setCachedData(symbol, 'income', result);
+  return result;
+};
+
+// Fetch cash flow statement
+export const fetchCashFlowStatement = async (symbol) => {
+  const cached = getCachedData(symbol, 'cashflow');
+  if (cached) return cached;
+
+  const data = await callAlphaVantage({
+    function: 'CASH_FLOW',
+    symbol: symbol.toUpperCase()
+  });
+
+  const annualReports = data.annualReports || [];
+  const quarterlyReports = data.quarterlyReports || [];
+
+  const annualData = filterIncompleteCurrentYear(
+    annualReports.map(report => ({
+      date: report.fiscalDateEnding,
+      period: 'annual',
+      operatingCashFlow: parseInt(report.operatingCashflow) || 0,
+      capitalExpenditures: parseInt(report.capitalExpenditures) || 0,
+      freeCashFlow: (parseInt(report.operatingCashflow) || 0) - Math.abs(parseInt(report.capitalExpenditures) || 0)
+    })).reverse(),
+    true
+  );
+
+  const quarterlyData = quarterlyReports.slice(0, 20).map(report => ({
+    date: report.fiscalDateEnding,
+    period: 'quarter',
+    operatingCashFlow: parseInt(report.operatingCashflow) || 0,
+    capitalExpenditures: parseInt(report.capitalExpenditures) || 0,
+    freeCashFlow: (parseInt(report.operatingCashflow) || 0) - Math.abs(parseInt(report.capitalExpenditures) || 0)
+  })).reverse();
+
+  const result = {
+    annual: annualData,
+    quarterly: quarterlyData
+  };
+
+  setCachedData(symbol, 'cashflow', result);
+  return result;
+};
+
+// Fetch balance sheet
+export const fetchBalanceSheet = async (symbol) => {
+  const cached = getCachedData(symbol, 'balance');
+  if (cached) return cached;
+
+  const data = await callAlphaVantage({
+    function: 'BALANCE_SHEET',
+    symbol: symbol.toUpperCase()
+  });
+
+  const annualReports = data.annualReports || [];
+  const quarterlyReports = data.quarterlyReports || [];
+
+  const annualData = filterIncompleteCurrentYear(
+    annualReports.map(report => ({
+      date: report.fiscalDateEnding,
+      period: 'annual',
+      totalAssets: parseInt(report.totalAssets) || 0,
+      totalLiabilities: parseInt(report.totalLiabilities) || 0,
+      cashAndCashEquivalents: parseInt(report.cashAndCashEquivalentsAtCarryingValue) || 0,
+      shortTermDebt: parseInt(report.shortTermDebt) || 0,
+      longTermDebt: parseInt(report.longTermDebtNoncurrent) || 0,
+      totalShareholderEquity: parseInt(report.totalShareholderEquity) || 0,
+      commonStockSharesOutstanding: parseFloat(report.commonStockSharesOutstanding) || 0
+    })).reverse(),
+    true
+  );
+
+  const quarterlyData = quarterlyReports.slice(0, 20).map(report => ({
+    date: report.fiscalDateEnding,
+    period: 'quarter',
+    totalAssets: parseInt(report.totalAssets) || 0,
+    totalLiabilities: parseInt(report.totalLiabilities) || 0,
+    cashAndCashEquivalents: parseInt(report.cashAndCashEquivalentsAtCarryingValue) || 0,
+    shortTermDebt: parseInt(report.shortTermDebt) || 0,
+    longTermDebt: parseInt(report.longTermDebtNoncurrent) || 0,
+    totalShareholderEquity: parseInt(report.totalShareholderEquity) || 0,
+    commonStockSharesOutstanding: parseFloat(report.commonStockSharesOutstanding) || 0
+  })).reverse();
+
+  const result = {
+    annual: annualData,
+    quarterly: quarterlyData
+  };
+
+  setCachedData(symbol, 'balance', result);
+  return result;
+};
+
+// Fetch company overview
+export const fetchCompanyOverview = async (symbol) => {
+  const cached = getCachedData(symbol, 'overview');
+  if (cached) return cached;
+
+  const data = await callAlphaVantage({
+    function: 'OVERVIEW',
+    symbol: symbol.toUpperCase()
+  });
+
+  // Keep Alpha Vantage's original field names (capital case) for compatibility
+  const profile = {
+    Symbol: data.Symbol,
+    Name: data.Name,
+    Description: data.Description,
+    Sector: data.Sector,
+    Industry: data.Industry,
+    Exchange: data.Exchange,
+    Currency: data.Currency,
+    MarketCapitalization: parseFloat(data.MarketCapitalization) || 0,
+    PERatio: parseFloat(data.PERatio) || 0,
+    PEGRatio: parseFloat(data.PEGRatio) || 0,
+    DividendYield: parseFloat(data.DividendYield) || 0,
+    EPS: parseFloat(data.EPS) || 0,
+    Beta: parseFloat(data.Beta) || 0,
+    BookValue: parseFloat(data.BookValue) || 0,
+    '52WeekHigh': parseFloat(data['52WeekHigh']) || 0,
+    '52WeekLow': parseFloat(data['52WeekLow']) || 0
+  };
+
+  setCachedData(symbol, 'overview', profile);
+  return profile;
+};
+
+// Fetch earnings data
+export const fetchEarningsData = async (symbol) => {
+  const cached = getCachedData(symbol, 'earnings');
+  if (cached) return cached;
+
+  const data = await callAlphaVantage({
+    function: 'EARNINGS',
+    symbol: symbol.toUpperCase()
+  });
+
+  const quarterlyEarnings = data.quarterlyEarnings || [];
+  const annualEarnings = data.annualEarnings || [];
+
+  const transformEarningsItem = (item) => ({
+    date: item.fiscalDateEnding,
+    reportedDate: item.reportedDate,
+    eps: parseFloat(item.reportedEPS) || 0,
+    estimatedEPS: parseFloat(item.estimatedEPS),
+    surprise: parseFloat(item.surprise),
+    surprisePercentage: parseFloat(item.surprisePercentage)
+  });
+
+  const result = {
+    quarterly: quarterlyEarnings.slice(0, 24).reverse().map(transformEarningsItem),
+    annual: annualEarnings.reverse().map(transformEarningsItem)
+  };
+
+  setCachedData(symbol, 'earnings', result);
+  return result;
+};
+
+// Fetch dividend history
+export const fetchDividendHistory = async (symbol) => {
+  try {
+    const cached = getCachedData(symbol, 'dividends');
+    if (cached) return cached;
+
+    const data = await callAlphaVantage({
+      function: 'DIVIDENDS',
+      symbol: symbol.toUpperCase()
+    });
+
+    const dividends = data.data || [];
+    
+    const result = {
+      annual: [],
+      quarterly: dividends.slice(0, 40).reverse().map(div => ({
+        date: div.exDividendDate || div.paymentDate,
+        dividendAmount: parseFloat(div.amount) || 0,
+        declarationDate: div.declarationDate
+      }))
+    };
+
+    setCachedData(symbol, 'dividends', result);
+    return result;
+  } catch (error) {
+    console.warn('[AlphaVantage] Dividend fetch failed:', error.message);
+    return { annual: [], quarterly: [] };
+  }
+};
+
+// Fetch all financial data
+export const fetchAllFinancialData = async (symbol) => {
+  const [
+    historicalData,
+    incomeStatement,
+    cashFlowStatement,
+    balanceSheet,
+    companyProfile,
+    earningsData,
+    dividendsData
+  ] = await Promise.all([
+    fetchHistoricalData(symbol),
+    fetchIncomeStatement(symbol),
+    fetchCashFlowStatement(symbol),
+    fetchBalanceSheet(symbol),
+    fetchCompanyOverview(symbol),
+    fetchEarningsData(symbol),
+    fetchDividendHistory(symbol).catch(err => {
+      console.warn(`Dividend fetch failed for ${symbol}:`, err.message);
+      return { annual: [], quarterly: [] };
+    })
+  ]);
+
+  return {
+    symbol: symbol.toUpperCase(),
+    historicalData,
+    incomeStatement,
+    cashFlowStatement,
+    balanceSheet,
+    profile: companyProfile,
+    earningsData,
+    dividendsData,
+    originalHistoricalData: historicalData,
+  };
+};
+
+// Clear cache
+export const clearCache = (symbol = null) => {
+  if (symbol) {
+    const endpoints = ['historical', 'income', 'cashflow', 'balance', 'overview', 'earnings', 'dividends'];
+    endpoints.forEach(endpoint => {
+      localStorage.removeItem(getCacheKey(symbol, endpoint));
+    });
+  } else {
+    // Clear all Alpha Vantage cache
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('av_')) {
+        localStorage.removeItem(key);
+      }
+    });
+  }
+};
+
+// Format timeframe label
+export const formatTimeframeLabel = (dateString, isAnnual = false) => {
+  if (!dateString) return 'Unknown';
+  const parsed = new Date(dateString);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return dateString;
+  }
+
+  const year = parsed.getFullYear();
+
+  if (isAnnual) {
+    return `FY ${year}`;
+  }
+
+  const quarter = Math.floor(parsed.getMonth() / 3) + 1;
+  return `Q${quarter} ${year}`;
+};
+
+// Filter historical data by period
+export const filterHistoricalData = (data, period = 'quarterly') => {
+  if (!data || data.length === 0) return [];
+  
+  const cutoffDate = new Date();
+  if (period === 'annual') {
+    cutoffDate.setFullYear(cutoffDate.getFullYear() - 20);
+  } else {
+    cutoffDate.setFullYear(cutoffDate.getFullYear() - 5);
+  }
+  
+  return data.filter(item => new Date(item.date) >= cutoffDate);
+};
+

@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { Button } from '@/components/ui/button';
 import SignInButton from './components/SignInButton';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2, TrendingUp, Building2, DollarSign, Users, Globe } from 'lucide-react';
+import { Search, Loader2, TrendingUp, Settings } from 'lucide-react';
 
 // Import chart components
 import PriceChart from './components/PriceChart';
@@ -18,22 +18,19 @@ import DividendsChart from './components/DividendsChart';
 import CompanyOverview from './components/CompanyOverview';
 import ErrorMessage from './components/ErrorMessage';
 import StockButton from './components/StockButton';
+import SettingsModal from './components/SettingsModal';
 
-// Import backend API helpers
-import { fetchAllFinancialData, clearCache, filterHistoricalData, fetchRateLimitInfo } from './utils/fetchAlphaVantage';
+// Import services
+import { 
+  fetchAllFinancialData, 
+  clearCache, 
+  filterHistoricalData,
+  loadApiKey,
+  hasApiKey as checkHasApiKey,
+  setApiKey as setAlphaVantageApiKey
+} from './services/alphaVantageService';
+import { logSearch } from './services/backendService';
 import './App.css';
-
-const CLIENT_RATE_LIMIT_MS = 60_000;
-
-// Format market cap to B/M/K format
-const formatMarketCap = (value) => {
-  if (!value) return 'N/A';
-  if (value >= 1e12) return `$${(value / 1e12).toFixed(1)}T`;
-  if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
-  if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
-  if (value >= 1e3) return `$${(value / 1e3).toFixed(1)}K`;
-  return `$${value.toFixed(0)}`;
-};
 
 function App() {
   const { isAuthenticated, isLoading: authLoading, loginWithRedirect } = useAuth0();
@@ -43,86 +40,70 @@ function App() {
   const [currentTicker, setCurrentTicker] = useState('');
   const [searchTicker, setSearchTicker] = useState('');
   const [timeframe, setTimeframe] = useState('quarter');
-  const [loginRequired, setLoginRequired] = useState(false);
-  const [rateLimitInfo, setRateLimitInfo] = useState(null);
-  const lastSearchTimestampRef = useRef(0);
+  const [showSettings, setShowSettings] = useState(false);
+  const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
 
-  const updateRateLimitInfo = useCallback(async () => {
+  // Check for API key on mount and auth change
+  useEffect(() => {
     if (!isAuthenticated) {
-      setRateLimitInfo(null);
+      setApiKeyConfigured(false);
       return;
     }
 
-    try {
-      const info = await fetchRateLimitInfo();
-      setRateLimitInfo(info);
-    } catch (quotaError) {
-      console.warn('[RateLimit] Failed to fetch quota info', quotaError);
+    // Load API key from localStorage (synchronous)
+    const key = loadApiKey();
+    if (key) {
+      setAlphaVantageApiKey(key);
+      setApiKeyConfigured(true);
+    } else {
+      setApiKeyConfigured(false);
     }
   }, [isAuthenticated]);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setRateLimitInfo(null);
-      return;
+  const handleApiKeyUpdate = (newKey) => {
+    if (newKey) {
+      setAlphaVantageApiKey(newKey);
+      setApiKeyConfigured(true);
+    } else {
+      setAlphaVantageApiKey(null);
+      setApiKeyConfigured(false);
     }
-
-    updateRateLimitInfo();
-    const interval = setInterval(updateRateLimitInfo, 60_000);
-    return () => clearInterval(interval);
-  }, [isAuthenticated, updateRateLimitInfo]);
-
-  // Clear login-required error when user successfully authenticates
-  useEffect(() => {
-    if (isAuthenticated && loginRequired) {
-      setLoginRequired(false);
-      setError(null);
-      updateRateLimitInfo();
-    }
-  }, [isAuthenticated, loginRequired, updateRateLimitInfo]);
+  };
 
   const handleSearch = async (ticker) => {
     setError(null);
-    setLoginRequired(false);
 
     const normalizedTicker = ticker.trim().toUpperCase();
-    if (normalizedTicker !== 'IBM' && !isAuthenticated) {
-      setLoginRequired(true);
-      setError('Please sign in to search for stocks other than IBM.');
+
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      setError('Please sign in to search for stocks.');
       return;
     }
 
-    const nowTimestamp = Date.now();
-    if (lastSearchTimestampRef.current && (nowTimestamp - lastSearchTimestampRef.current) < CLIENT_RATE_LIMIT_MS) {
-      const waitSeconds = Math.ceil((CLIENT_RATE_LIMIT_MS - (nowTimestamp - lastSearchTimestampRef.current)) / 1000);
-      setError(`Rate limit: Please wait ${waitSeconds} second(s) before searching again.`);
+    // Check if API key is configured
+    if (!apiKeyConfigured) {
+      setError('Please configure your Alpha Vantage API key in Settings.');
+      setShowSettings(true);
       return;
     }
-    lastSearchTimestampRef.current = nowTimestamp;
 
     try {
       setCurrentTicker(normalizedTicker);
       setSearchTicker(normalizedTicker);
       setLoading(true);
 
-      const result = await fetchAllFinancialData(normalizedTicker);
-      setFinancialData(result.data);
-      if (result.rateLimit) {
-        setRateLimitInfo(result.rateLimit);
-      }
+      // Fire-and-forget: log search to backend
+      logSearch(normalizedTicker);
+
+      // Fetch data from Alpha Vantage
+      const data = await fetchAllFinancialData(normalizedTicker);
+      setFinancialData(data);
     } catch (fetchError) {
       console.error('Error fetching data:', fetchError);
       const message = fetchError.message || 'An error occurred while fetching data';
       setError(message);
       setFinancialData(null);
-
-      if (fetchError.status === 429 && fetchError.details) {
-        setRateLimitInfo(prev => ({
-          ...(prev ?? {}),
-          ...fetchError.details,
-        }));
-        await updateRateLimitInfo();
-      }
     } finally {
       setLoading(false);
     }
@@ -143,7 +124,6 @@ function App() {
 
   const handleTimeframeChange = (newTimeframe) => {
     setTimeframe(newTimeframe);
-    // Filter existing historical data based on new timeframe
     if (financialData && financialData.originalHistoricalData) {
       const filteredData = filterHistoricalData(financialData.originalHistoricalData, newTimeframe);
       setFinancialData(prevData => ({
@@ -160,7 +140,6 @@ function App() {
     setSearchTicker('');
     alert('Local cache cleared. Fresh data will be fetched on next search.');
   };
-
 
   return (
     <div className="min-h-screen bg-background">
@@ -181,6 +160,17 @@ function App() {
             </div>
             
             <div className="flex items-center gap-2">
+              {/* Settings */}
+              {isAuthenticated && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowSettings(true)}
+                  title="API Key Settings"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              )}
               {/* Sign In / Sign Out */}
               <SignInButton />
             </div>
@@ -188,38 +178,40 @@ function App() {
         </div>
       </header>
 
-      {/* Rate Limiting Information Banner */}
-      {isAuthenticated && rateLimitInfo ? (
+      {/* API Key Configuration Banner */}
+      {isAuthenticated && !apiKeyConfigured && (
+        <div className="bg-orange-50 dark:bg-orange-950 border-b border-orange-200 dark:border-orange-800">
+          <div className="container mx-auto px-4 py-3">
+            <div className="flex items-center justify-between text-sm flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                <span className="text-orange-800 dark:text-orange-200">
+                  <strong>API Key Required:</strong> Please configure your Alpha Vantage API key to search stocks.
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSettings(true)}
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Configure API Key
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Info Banner */}
+      {!isAuthenticated && (
         <div className="bg-blue-50 dark:bg-blue-950 border-b border-blue-200 dark:border-blue-800">
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between text-sm flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                 <span className="text-blue-800 dark:text-blue-200">
-                  <strong>Your Limit:</strong> {rateLimitInfo.remaining} of {rateLimitInfo.total} searches remaining
-                  {rateLimitInfo.resetAt && (
-                    <span> (resets in {Math.max(0, Math.ceil((rateLimitInfo.resetAt - Date.now()) / (60 * 60 * 1000)))} hours)</span>
-                  )}
+                  <strong>Sign In Required:</strong> Sign in with your account and configure your free Alpha Vantage API key to search stocks.
                 </span>
-              </div>
-              <div className="text-blue-700 dark:text-blue-300">
-                <span>1 search per minute • 10 unique stocks per 24 hours • IBM demo is unlimited</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-yellow-50 dark:bg-yellow-950 border-b border-yellow-200 dark:border-yellow-800">
-          <div className="container mx-auto px-4 py-3">
-            <div className="flex items-center justify-between text-sm flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                <span className="text-yellow-800 dark:text-yellow-200">
-                  <strong>Demo Mode:</strong> IBM stock available • Sign in to search other stocks (1 per minute, 10 per 24 hours)
-                </span>
-              </div>
-              <div className="text-yellow-700 dark:text-yellow-300">
-                <span>Cache stores data for 24 hours</span>
               </div>
             </div>
           </div>
@@ -234,7 +226,7 @@ function App() {
             <form onSubmit={handleSubmit} className="flex gap-2">
               <Input
                 type="text"
-                placeholder={isAuthenticated ? "Enter stock ticker (e.g., IBM)" : "Enter stock ticker (IBM demo, others require login)"}
+                placeholder="Enter stock ticker (e.g., IBM, AAPL, GOOGL, MSFT)"
                 value={searchTicker}
                 onChange={(e) => setSearchTicker(e.target.value.toUpperCase())}
                 className="w-full md:w-64"
@@ -242,7 +234,7 @@ function App() {
               />
               <Button 
                 type="submit" 
-                disabled={loading || authLoading || !searchTicker.trim()}
+                disabled={loading || authLoading || !searchTicker.trim() || !isAuthenticated || !apiKeyConfigured}
                 className="px-6"
               >
                 <Search className="h-4 w-4 mr-2" />
@@ -285,8 +277,8 @@ function App() {
             <ErrorMessage 
               error={error} 
               onRetry={handleRetry}
-              loginRequired={loginRequired}
-              onLogin={loginRequired ? () => loginWithRedirect() : undefined}
+              loginRequired={!isAuthenticated}
+              onLogin={!isAuthenticated ? () => loginWithRedirect() : undefined}
             />
           </div>
         )}
@@ -399,39 +391,36 @@ function App() {
               revenue, EBITDA, cash flow, and more.
               {!isAuthenticated && (
                 <span className="block mt-2 text-sm text-orange-600 dark:text-orange-400">
-                  IBM is available as a demo. Sign in to search for other stocks.
+                  Sign in and configure your Alpha Vantage API key to get started.
+                </span>
+              )}
+              {isAuthenticated && !apiKeyConfigured && (
+                <span className="block mt-2 text-sm text-orange-600 dark:text-orange-400">
+                  Configure your Alpha Vantage API key in Settings to get started.
                 </span>
               )}
             </p>
-            <div className="text-sm text-muted-foreground mb-8">
-              <p className="mb-2">Try the demo stock:</p>
-              <div className="flex flex-wrap justify-center gap-2">
-                {['IBM'].map((ticker) => (
-                  <StockButton
-                    key={ticker}
-                    ticker={ticker}
-                    onSearch={handleSearch}
-                    disabled={loading}
-                  />
-                ))}
-              </div>
-            </div>
             <div className="text-sm text-muted-foreground">
               <p className="mb-2">
-                Try popular stocks like:{' '}
+                Popular stocks to try:{' '}
                 {!isAuthenticated && (
                   <span className="text-orange-600 dark:text-orange-400 font-medium">
                     (Sign in required)
                   </span>
                 )}
+                {isAuthenticated && !apiKeyConfigured && (
+                  <span className="text-orange-600 dark:text-orange-400 font-medium">
+                    (API key required)
+                  </span>
+                )}
               </p>
               <div className="flex flex-wrap justify-center gap-2">
-                {['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META'].map((ticker) => (
+                {['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META', 'IBM'].map((ticker) => (
                   <StockButton
                     key={ticker}
                     ticker={ticker}
                     onSearch={handleSearch}
-                    disabled={loading || authLoading}
+                    disabled={loading || authLoading || !isAuthenticated || !apiKeyConfigured}
                   />
                 ))}
               </div>
@@ -451,9 +440,14 @@ function App() {
         </div>
       </footer>
 
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onApiKeyUpdate={handleApiKeyUpdate}
+      />
     </div>
   );
 }
 
 export default App;
-

@@ -42,17 +42,17 @@ The application uses the following Alpha Vantage API endpoints:
 
 ### API Call Management
 
-- Each stock search makes 7 API calls in parallel
+- Each stock search makes 7 API calls in parallel **directly from your browser**
 - Results are cached in localStorage for 24 hours
 - Cache can be cleared using the "Clear Cache" button
 - Free tier limit: 25 API calls per day
 
 ### API Key Management
 
-- API key can be set in the Settings modal
-- Key is stored in localStorage for persistence
-- Demo key is used for IBM if no key is set
-- Key can be cleared using the "Clear API Key" button
+- **Each user provides their own Alpha Vantage API key** (required by Alpha Vantage ToS)
+- API key is **stored in browser localStorage** (never sent to backend)
+- Frontend uses the key for direct Alpha Vantage API calls
+- No shared API key - each user uses their own quota
 
 ## 🛠 Technology Stack
 
@@ -103,56 +103,99 @@ pnpm install
    }
    ```
 
-### 3. Alpha Vantage API Key Setup
+### 3. Start the Backend (Required)
+
+```bash
+cd backend
+npm install
+sam build
+sam local start-api --env-vars env.local.json --port 3000
+```
+
+Leave this running in a terminal.
+
+### 4. Alpha Vantage API Key Setup
 
 1. Sign up for a free account at [Alpha Vantage](https://www.alphavantage.co/support/#api-key)
-2. Get your API key from the dashboard
-3. Start the application and click the Settings icon (⚙️) in the top right
-4. Enter your Alpha Vantage API key in the Settings modal
-5. The key will be stored in your browser's localStorage
+2. Get your FREE API key (supports 25 requests/day)
+3. Start the frontend application (next step)
+4. Sign in using Auth0
+5. Click the Settings icon (⚙️) in the top right
+6. Enter your Alpha Vantage API key in the Settings modal
+7. The key will be saved in your browser's localStorage
 
-> **Note**: The demo key works for IBM stock only. You need your own API key to search for other stocks.
+> **Important**: Each user must provide their own Alpha Vantage API key. This is required by Alpha Vantage's Terms of Service. Your API key is stored locally in your browser and never sent to our servers.
 
 ## 🏗️ Backend & Deployment
 
-The application now uses a dedicated AWS-backed API layer. The repository contains a `backend/` folder with the Lambda handlers. See [`backend/README.md`](backend/README.md) for full deployment instructions (API Gateway, Lambda, DynamoDB, Secrets Manager, CloudWatch).
+The application uses an **ultra-minimal AWS backend** for:
+1. **Search Logging** - Logs searches to CloudWatch for analytics
+
+The backend **does NOT**:
+- ❌ Call Alpha Vantage
+- ❌ Store API keys
+- ❌ Enforce rate limiting
+- ❌ Use DynamoDB or any database
+
+All data fetching happens directly from the frontend to Alpha Vantage using each user's personal API key stored in their browser's localStorage. Search logs go to CloudWatch Logs (automatically captured from Lambda console output).
 
 ### Required Environment Variables
 
 Frontend (`.env`):
 
 ```
-VITE_API_BASE_URL=https://your-api-gateway-id.execute-api.region.amazonaws.com/prod
+VITE_API_BASE_URL=http://localhost:3000  # For local development
+# or
+VITE_API_BASE_URL=https://your-api-gateway-id.execute-api.region.amazonaws.com/Prod  # For production
 ```
 
 Backend (Lambda):
 
-- `ALPHA_VANTAGE_SECRET_ID` – Secrets Manager secret containing the Alpha Vantage API key
-- `RATE_LIMIT_TABLE` – DynamoDB table for rate limiting
-- `METRICS_NAMESPACE` – CloudWatch metrics namespace (default: `StockInsights/Usage`)
-- `ALLOWED_ORIGIN` – Allowed CORS origin (e.g., your CloudFront domain)
-- Optional tuning variables: `RATE_LIMIT_DAILY_MAX`, `RATE_LIMIT_MIN_INTERVAL_MS`, `RATE_LIMIT_WINDOW_MS`, `API_KEY_CACHE_TTL_MS`
+- `ALLOWED_ORIGIN` – Allowed CORS origin (e.g., your frontend domain)
+- `ALLOW_ANONYMOUS_LOCAL` – Set to 'true' for local development
 
 ### API Overview
 
-- `POST /stocks/search` – Fetches financial data, enforces rate limits, caches responses
-- `GET /quota` – Returns per-user quota (remaining searches, reset time, next allowed search)
-- `DELETE /cache?symbol=XYZ` – Clears cached data for a ticker (admin convenience)
+- `POST /stocks/search` – Log search to CloudWatch (returns 202 immediately)
 
-API responses include `Cache-Control` headers so API Gateway caching can be enabled for additional cost savings.
+**No rate limiting** is enforced by the backend - users are subject to Alpha Vantage's own rate limits (5/min, 500/day).
 
-The frontend still enforces a **client-side 1-search-per-minute** guard to reduce backend quota polling. The backend strictly enforces the **10 searches per 24 hours** quota.
+### Viewing Search Logs
 
-### 4. Development
+In production, view logs in AWS CloudWatch:
+- Log Group: `/aws/lambda/StockInsightsFunction`
+- Logs are structured JSON for easy querying:
+  ```json
+  {
+    "event": "stock_search",
+    "userId": "auth0|123...",
+    "symbol": "AAPL",
+    "timestamp": "2024-01-15T10:30:00.000Z",
+    "requestId": "abc-123..."
+  }
+  ```
+
+### Local Development
 
 ```bash
-# Start development server
+cd backend
+npm install
+sam build
+sam local start-api --env-vars env.local.json --port 3000
+```
+
+See [`ARCHITECTURE_CHANGES.md`](ARCHITECTURE_CHANGES.md) for detailed information about the architectural changes.
+
+### 5. Start Frontend Development Server
+
+```bash
+# In a new terminal (keep backend running)
 pnpm run dev
 
 # Open http://localhost:5173 in your browser
 ```
 
-### 5. Production Build
+### 6. Production Build
 
 ```bash
 # Create production build
@@ -253,32 +296,33 @@ import { clearCache, getCacheInfo } from './utils/fetchAlphaVantage';
 ### Rate Limit Response Example
 ```json
 {
-  "Information": "We have detected your API key as BXRWZ50IEE327KHI and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits."
+  "Information": "We have detected your API key as XXXXXXXXXXXXXXXX and our standard API rate limit is 25 requests per day. Please subscribe to any of the premium plans at https://www.alphavantage.co/premium/ to instantly remove all daily rate limits."
 }
 ```
 
 ### Usage Strategy
-- **Research 3 stocks per day** maximum to stay within limits
-- **Cache persists for 24 hours** - revisit stocks without new API calls
-- **Plan your research** - prioritize most important stocks
-- **Monitor usage** through browser console or Alpha Vantage dashboard
+- **Use your own API key** - each user has their own quota
+- **No backend rate limiting** - managed entirely by Alpha Vantage
+- **Cache persists for 24 minutes** - revisit stocks without new API calls
+- **Monitor usage** through Alpha Vantage dashboard (if available)
 
 ### Cache Management
 ```javascript
-// View cache information
-import { getCacheInfo } from './utils/fetchAlphaVantage';
-console.log(getCacheInfo());
-
 // Clear all cached data
-import { clearCache } from './utils/fetchAlphaVantage';
+import { clearCache } from './services/alphaVantageService';
 clearCache();
+
+// Clear cache for specific stock
+clearCache('AAPL');
 ```
 
+Or use the "Clear Cache" button in the application UI.
+
 ### When Rate Limited
-1. **Error Message**: Clear indication of rate limit reached
-2. **Cached Data**: Continue using cached data for previously analyzed stocks
-3. **Wait Period**: Rate limit resets daily at midnight UTC
-4. **Upgrade Option**: Premium plans remove all rate limits
+1. **Error Message**: Alpha Vantage error displayed to user
+2. **Cached Data**: Continue using cached data for previously analyzed stocks (30 min cache)
+3. **Daily limit**: Resets at midnight UTC
+4. **Upgrade Option**: Alpha Vantage premium plans offer higher limits
 
 ## 🚨 Error Handling
 
@@ -403,5 +447,5 @@ For issues or questions:
 
 ---
 
-**Note**: This application uses Alpha Vantage's free tier (25 calls/day) with intelligent caching to provide comprehensive financial analysis. The caching system ensures you can research multiple stocks efficiently while staying within API limits.
+**Note**: This application requires each user to provide their own Alpha Vantage API key, as required by Alpha Vantage's Terms of Service. The free tier provides 25 requests per day, allowing you to research approximately 7 stocks daily. API keys are stored in your browser's localStorage (never sent to our servers), and all data fetching happens directly from your browser to Alpha Vantage.
 
