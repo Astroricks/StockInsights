@@ -11,15 +11,21 @@ const defaultHeaders = () => ({
 
 /**
  * Log user's search (fire-and-forget)
+ * @param {string} symbol - Stock ticker symbol
+ * @param {object} userInfo - User information (name, email)
  */
-export const logSearch = async (symbol) => {
+export const logSearch = async (symbol, userInfo = {}) => {
   try {
     // Don't await - fire and forget
     fetch(buildUrl('/stocks/search'), {
       method: 'POST',
       headers: defaultHeaders(),
       credentials: 'include',
-      body: JSON.stringify({ symbol }),
+      body: JSON.stringify({ 
+        symbol,
+        userName: userInfo.name,
+        userEmail: userInfo.email
+      }),
     }).catch(err => {
       console.warn('[Backend] Failed to log search:', err);
     });

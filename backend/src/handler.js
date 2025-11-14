@@ -55,7 +55,7 @@ const handleSearch = async (event) => {
     return errorResponse(401, 'Unauthorized request');
   }
 
-  const { symbol } = getBody(event);
+  const { symbol, userName, userEmail } = getBody(event);
   if (!symbol) {
     return errorResponse(400, 'Missing "symbol" in request body');
   }
@@ -64,6 +64,8 @@ const handleSearch = async (event) => {
   console.log(JSON.stringify({
     event: 'stock_search',
     userId,
+    userName: userName || 'N/A',
+    userEmail: userEmail || 'N/A',
     symbol: symbol.toUpperCase(),
     timestamp: new Date().toISOString(),
     requestId: event.requestContext?.requestId,

@@ -119,8 +119,11 @@ function App() {
       }
 
       // Fire-and-forget: log search to backend (only for authenticated users)
-      if (isAuthenticated) {
-        logSearch(normalizedTicker);
+      if (isAuthenticated && user) {
+        logSearch(normalizedTicker, {
+          name: user.name,
+          email: user.email
+        });
       }
 
       // Fetch data from Alpha Vantage
