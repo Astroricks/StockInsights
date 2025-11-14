@@ -159,6 +159,13 @@ function App() {
     }
   };
 
+  const handleGoHome = () => {
+    setFinancialData(null);
+    setCurrentTicker('');
+    setSearchTicker('');
+    setError(null);
+  };
+
   const handleTimeframeChange = (newTimeframe) => {
     setTimeframe(newTimeframe);
     if (financialData && financialData.originalHistoricalData) {
@@ -184,7 +191,18 @@ function App() {
       <header className="border-b border-border bg-card">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div 
+              className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={handleGoHome}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleGoHome();
+                }
+              }}
+            >
               <TrendingUp className="h-8 w-8 text-primary" />
               <div>
                 <h1 className="text-2xl font-bold text-foreground">
