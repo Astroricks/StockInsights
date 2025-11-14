@@ -139,7 +139,7 @@ const SettingsModal = ({ isOpen, onClose, onApiKeyUpdate, userId }) => {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-primary hover:underline mt-2"
               >
-                Get API Key <ExternalLink className="h-3 w-3" />
+                Get Alpha Vantage Free API Key <ExternalLink className="h-3 w-3" />
               </a>
             </AlertDescription>
           </Alert>
