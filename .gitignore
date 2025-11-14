@@ -15,6 +15,10 @@ dist
 build
 *.log
 
+# AWS SAM
+.aws-sam
+samconfig.toml
+
 # IDE files
 .vscode
 .idea
