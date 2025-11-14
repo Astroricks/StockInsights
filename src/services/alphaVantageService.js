@@ -2,39 +2,74 @@ import axios from 'axios';
 
 const ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query';
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-const API_KEY_STORAGE_KEY = 'alpha_vantage_api_key';
+const API_KEY_STORAGE_PREFIX = 'alpha_vantage_api_key';
 
 let API_KEY = null;
+let CURRENT_USER_ID = null;
 
-// API Key Management (localStorage-based)
-export const saveApiKey = (apiKey) => {
+// Forward declaration for clearCache (defined later in the file)
+let clearCacheFunction;
+
+// Helper to get user-specific storage key
+const getUserStorageKey = (userId) => {
+  if (!userId) {
+    return API_KEY_STORAGE_PREFIX; // Fallback to global key for backward compatibility
+  }
+  return `${API_KEY_STORAGE_PREFIX}_${userId}`;
+};
+
+// API Key Management (localStorage-based, user-specific)
+export const saveApiKey = (apiKey, userId = null) => {
   if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length === 0) {
     throw new Error('Valid API key is required');
   }
   
   const trimmedKey = apiKey.trim();
-  localStorage.setItem(API_KEY_STORAGE_KEY, trimmedKey);
+  const storageKey = getUserStorageKey(userId);
+  
+  // Check if the key is actually changing
+  const oldKey = localStorage.getItem(storageKey);
+  const keyChanged = oldKey !== trimmedKey;
+  
+  localStorage.setItem(storageKey, trimmedKey);
   API_KEY = trimmedKey;
+  CURRENT_USER_ID = userId;
+  
+  // Clear cache when API key changes
+  if (keyChanged && clearCacheFunction) {
+    clearCacheFunction();
+  }
+  
   return { success: true, message: 'API key saved successfully' };
 };
 
-export const loadApiKey = () => {
-  const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+export const loadApiKey = (userId = null) => {
+  const storageKey = getUserStorageKey(userId);
+  const storedKey = localStorage.getItem(storageKey);
   if (storedKey) {
     API_KEY = storedKey;
+    CURRENT_USER_ID = userId;
     return storedKey;
   }
   return null;
 };
 
-export const deleteApiKey = () => {
-  localStorage.removeItem(API_KEY_STORAGE_KEY);
+export const deleteApiKey = (userId = null) => {
+  const storageKey = getUserStorageKey(userId);
+  localStorage.removeItem(storageKey);
   API_KEY = null;
+  CURRENT_USER_ID = null;
+  
+  // Clear cache when API key is deleted
+  if (clearCacheFunction) {
+    clearCacheFunction();
+  }
+  
   return { success: true, message: 'API key removed successfully' };
 };
 
-export const hasApiKey = () => {
-  return !!loadApiKey();
+export const hasApiKey = (userId = null) => {
+  return !!loadApiKey(userId);
 };
 
 // Set API key directly (for backward compatibility)
@@ -85,7 +120,8 @@ const setCachedData = (symbol, endpoint, data) => {
 const callAlphaVantage = async (params) => {
   // Try to load API key from localStorage if not already set
   if (!API_KEY) {
-    const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+    const storageKey = getUserStorageKey(CURRENT_USER_ID);
+    const storedKey = localStorage.getItem(storageKey);
     if (storedKey) {
       API_KEY = storedKey;
     }
@@ -469,6 +505,9 @@ export const clearCache = (symbol = null) => {
     });
   }
 };
+
+// Assign clearCache to the forward-declared variable so it can be used earlier
+clearCacheFunction = clearCache;
 
 // Format timeframe label
 export const formatTimeframeLabel = (dateString, isAnnual = false) => {

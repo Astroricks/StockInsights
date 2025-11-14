@@ -4,24 +4,26 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Key, ExternalLink, Check, X } from 'lucide-react';
+import { Key, ExternalLink, Check, X, Eye, EyeOff } from 'lucide-react';
 import { saveApiKey, loadApiKey, deleteApiKey } from '../services/alphaVantageService';
 
-const SettingsModal = ({ isOpen, onClose, onApiKeyUpdate }) => {
+const SettingsModal = ({ isOpen, onClose, onApiKeyUpdate, userId }) => {
   const [apiKey, setApiKey] = useState('');
   const [message, setMessage] = useState(null);
   const [hasExistingKey, setHasExistingKey] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       loadExistingKey();
+      setShowApiKey(false); // Reset to hidden when modal opens
     }
-  }, [isOpen]);
+  }, [isOpen, userId]);
 
   const loadExistingKey = () => {
     setMessage(null);
     
-    const existingKey = loadApiKey();
+    const existingKey = loadApiKey(userId);
     if (existingKey) {
       setApiKey(existingKey);
       setHasExistingKey(true);
@@ -38,7 +40,7 @@ const SettingsModal = ({ isOpen, onClose, onApiKeyUpdate }) => {
     }
 
     try {
-      saveApiKey(apiKey.trim());
+      saveApiKey(apiKey.trim(), userId);
       setMessage({ type: 'success', text: 'API key saved successfully!' });
       setHasExistingKey(true);
       
@@ -63,7 +65,7 @@ const SettingsModal = ({ isOpen, onClose, onApiKeyUpdate }) => {
     }
 
     try {
-      deleteApiKey();
+      deleteApiKey(userId);
       setApiKey('');
       setHasExistingKey(false);
       setMessage({ type: 'success', text: 'API key deleted successfully' });
@@ -95,13 +97,28 @@ const SettingsModal = ({ isOpen, onClose, onApiKeyUpdate }) => {
           {/* API Key Input */}
           <div className="space-y-2">
             <Label htmlFor="apiKey">API Key</Label>
-            <Input
-              id="apiKey"
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="Enter your Alpha Vantage API key"
-            />
+            <div className="relative">
+              <Input
+                id="apiKey"
+                type={showApiKey ? "text" : "password"}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="Enter your Alpha Vantage API key"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKey(!showApiKey)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                tabIndex={-1}
+              >
+                {showApiKey ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
             <p className="text-xs text-muted-foreground">
               Your API key is stored securely in your browser's local storage.
             </p>
@@ -112,8 +129,7 @@ const SettingsModal = ({ isOpen, onClose, onApiKeyUpdate }) => {
             <AlertDescription className="text-sm">
               <p className="font-semibold mb-2">Don't have an API key?</p>
               <ol className="list-decimal list-inside space-y-1 text-xs">
-                <li>Visit Alpha Vantage's website</li>
-                <li>Click "Get Your Free API Key Today"</li>
+                <li>Visit Alpha Vantage's website (link below)</li>  
                 <li>Fill out the form and submit</li>
                 <li>Copy your API key and paste it above</li>
               </ol>

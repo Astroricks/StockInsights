@@ -33,7 +33,7 @@ import { logSearch } from './services/backendService';
 import './App.css';
 
 function App() {
-  const { isAuthenticated, isLoading: authLoading, loginWithRedirect } = useAuth0();
+  const { isAuthenticated, isLoading: authLoading, loginWithRedirect, user } = useAuth0();
   const [financialData, setFinancialData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -45,20 +45,27 @@ function App() {
 
   // Check for API key on mount and auth change
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user) {
       setApiKeyConfigured(false);
+      // Clear API key when user logs out
+      setAlphaVantageApiKey(null);
       return;
     }
 
-    // Load API key from localStorage (synchronous)
-    const key = loadApiKey();
+    // Load API key from localStorage (user-specific)
+    const userId = user.sub;
+    const key = loadApiKey(userId);
     if (key) {
       setAlphaVantageApiKey(key);
       setApiKeyConfigured(true);
     } else {
       setApiKeyConfigured(false);
+      // Automatically show settings modal if user is logged in but has no API key
+      if (!authLoading) {
+        setShowSettings(true);
+      }
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authLoading, user]);
 
   const handleApiKeyUpdate = (newKey) => {
     if (newKey) {
@@ -68,6 +75,11 @@ function App() {
       setAlphaVantageApiKey(null);
       setApiKeyConfigured(false);
     }
+    
+    // Clear displayed data when API key changes
+    setFinancialData(null);
+    setCurrentTicker('');
+    setError(null);
   };
 
   const handleSearch = async (ticker) => {
@@ -98,9 +110,9 @@ function App() {
       if (isDemo && !apiKeyConfigured) {
         // For IBM demo, directly set and use 'demo' key
         setAlphaVantageApiKey('demo');
-      } else if (apiKeyConfigured) {
+      } else if (apiKeyConfigured && user) {
         // Reload user's key from localStorage to ensure it's available
-        const userKey = loadApiKey();
+        const userKey = loadApiKey(user.sub);
         if (userKey) {
           setAlphaVantageApiKey(userKey);
         }
@@ -461,6 +473,7 @@ function App() {
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         onApiKeyUpdate={handleApiKeyUpdate}
+        userId={user?.sub}
       />
     </div>
   );
