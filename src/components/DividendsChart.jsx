@@ -59,6 +59,28 @@ const DividendsChart = ({ data, timeframe = 'Quarterly' }) => {
     }
   }).filter(item => item.dividend > 0 && item.date !== 'Unknown');
 
+  // Check if chartData is empty after filtering
+  if (chartData.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span>Dividends</span>
+              <InfoButton term="Dividends" />
+            </div>
+            <span className="text-sm text-muted-foreground">{timeframe}</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64 flex items-center justify-center text-muted-foreground">
+            No dividend data available
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   // Calculate metrics
   const latestDividend = chartData[chartData.length - 1]?.dividend || 0;
   const previousDividend = chartData[chartData.length - 2]?.dividend || 0;

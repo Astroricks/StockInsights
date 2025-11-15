@@ -2,7 +2,6 @@
   "domain": "YOUR_AUTH0_DOMAIN",
   "clientId": "YOUR_AUTH0_CLIENT_ID",
   "redirectUri": "http://localhost:5173/StockInsights/",
-  "logoutReturnTo": "http://localhost:5173/StockInsights/",
-  "sharedApiKey": "YOUR_SHARED_ALPHA_VANTAGE_API_KEY"
+  "logoutReturnTo": "http://localhost:5173/StockInsights/"
 }
 
