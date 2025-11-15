@@ -456,38 +456,45 @@ export const fetchDividendHistory = async (symbol) => {
 
 // Fetch all financial data
 export const fetchAllFinancialData = async (symbol) => {
-  const [
-    historicalData,
-    incomeStatement,
-    cashFlowStatement,
-    balanceSheet,
-    companyProfile,
-    earningsData,
-    dividendsData
-  ] = await Promise.all([
-    fetchHistoricalData(symbol),
-    fetchIncomeStatement(symbol),
-    fetchCashFlowStatement(symbol),
-    fetchBalanceSheet(symbol),
-    fetchCompanyOverview(symbol),
-    fetchEarningsData(symbol),
-    fetchDividendHistory(symbol).catch(err => {
-      console.warn(`Dividend fetch failed for ${symbol}:`, err.message);
-      return { annual: [], quarterly: [] };
-    })
-  ]);
+  try {
+    const [
+      historicalData,
+      incomeStatement,
+      cashFlowStatement,
+      balanceSheet,
+      companyProfile,
+      earningsData,
+      dividendsData
+    ] = await Promise.all([
+      fetchHistoricalData(symbol),
+      fetchIncomeStatement(symbol),
+      fetchCashFlowStatement(symbol),
+      fetchBalanceSheet(symbol),
+      fetchCompanyOverview(symbol),
+      fetchEarningsData(symbol),
+      fetchDividendHistory(symbol).catch(err => {
+        console.warn(`Dividend fetch failed for ${symbol}:`, err.message);
+        return { annual: [], quarterly: [] };
+      })
+    ]);
 
-  return {
-    symbol: symbol.toUpperCase(),
-    historicalData,
-    incomeStatement,
-    cashFlowStatement,
-    balanceSheet,
-    profile: companyProfile,
-    earningsData,
-    dividendsData,
-    originalHistoricalData: historicalData,
-  };
+    return {
+      symbol: symbol.toUpperCase(),
+      historicalData,
+      incomeStatement,
+      cashFlowStatement,
+      balanceSheet,
+      profile: companyProfile,
+      earningsData,
+      dividendsData,
+      originalHistoricalData: historicalData,
+    };
+  } catch (error) {
+    // Clear any partial cache for this symbol on error
+    console.warn(`[AlphaVantage] Fetch failed for ${symbol}, clearing cache:`, error.message);
+    clearCache(symbol);
+    throw error;
+  }
 };
 
 // Clear cache
@@ -505,6 +512,52 @@ export const clearCache = (symbol = null) => {
       }
     });
   }
+};
+
+// Get cached stock symbols
+export const getCachedStocks = () => {
+  const symbols = new Set();
+  const now = Date.now();
+  
+  Object.keys(localStorage).forEach(key => {
+    if (key.startsWith('av_')) {
+      try {
+        // Extract symbol from cache key format: av_SYMBOL_endpoint
+        const parts = key.split('_');
+        if (parts.length >= 3) {
+          const symbol = parts[1];
+          
+          // Check if cache is still valid
+          const cached = localStorage.getItem(key);
+          if (cached) {
+            const { timestamp } = JSON.parse(cached);
+            if (now - timestamp < CACHE_DURATION) {
+              symbols.add(symbol);
+            }
+          }
+        }
+      } catch (error) {
+        // Skip invalid cache entries
+      }
+    }
+  });
+  
+  return Array.from(symbols).sort();
+};
+
+// Check if a stock has valid cached data
+export const isStockCached = (symbol) => {
+  if (!symbol) return false;
+  
+  const normalizedSymbol = symbol.toUpperCase();
+  const now = Date.now();
+  const endpoints = ['historical', 'income', 'cashflow', 'balance', 'overview', 'earnings', 'dividends'];
+  
+  // Check if at least the overview endpoint is cached (minimum requirement)
+  const overviewKey = getCacheKey(normalizedSymbol, 'overview');
+  const cached = getCachedData(normalizedSymbol, 'overview');
+  
+  return cached !== null;
 };
 
 // Assign clearCache to the forward-declared variable so it can be used earlier

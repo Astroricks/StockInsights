@@ -27,7 +27,9 @@ import {
   filterHistoricalData,
   loadApiKey,
   hasApiKey as checkHasApiKey,
-  setApiKey as setAlphaVantageApiKey
+  setApiKey as setAlphaVantageApiKey,
+  getCachedStocks,
+  isStockCached
 } from './services/alphaVantageService';
 import { logSearch } from './services/backendService';
 import './App.css';
@@ -42,6 +44,7 @@ function App() {
   const [timeframe, setTimeframe] = useState('quarter');
   const [showSettings, setShowSettings] = useState(false);
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
+  const [cachedStocks, setCachedStocks] = useState([]);
 
   // Check for API key on mount and auth change
   useEffect(() => {
@@ -66,6 +69,16 @@ function App() {
       }
     }
   }, [isAuthenticated, authLoading, user]);
+
+  // Load cached stocks on mount and when data changes
+  useEffect(() => {
+    const updateCachedStocks = () => {
+      const stocks = getCachedStocks();
+      setCachedStocks(stocks);
+    };
+    
+    updateCachedStocks();
+  }, [financialData]); // Update when financial data changes
 
   const handleApiKeyUpdate = (newKey) => {
     if (newKey) {
@@ -106,6 +119,9 @@ function App() {
       setSearchTicker(normalizedTicker);
       setLoading(true);
 
+      // Check if data is already cached
+      const isCached = isStockCached(normalizedTicker);
+
       // Ensure API key is set before fetching
       if (isDemo && !apiKeyConfigured) {
         // For IBM demo, directly set and use 'demo' key
@@ -118,15 +134,15 @@ function App() {
         }
       }
 
-      // Fire-and-forget: log search to backend (only for authenticated users)
-      if (isAuthenticated && user) {
+      // Fire-and-forget: log search to backend (only for authenticated users and non-cached data)
+      if (isAuthenticated && user && !isCached) {
         logSearch(normalizedTicker, user.sub, {
           name: user.name,
           email: user.email
         });
       }
 
-      // Fetch data from Alpha Vantage
+      // Fetch data from Alpha Vantage (will use cache if available)
       const data = await fetchAllFinancialData(normalizedTicker);
       
       // Filter historical data based on current timeframe
@@ -141,6 +157,8 @@ function App() {
       const message = fetchError.message || 'An error occurred while fetching data';
       setError(message);
       setFinancialData(null);
+      // Refresh cached stocks list (in case partial cache was cleared)
+      setCachedStocks(getCachedStocks());
     } finally {
       setLoading(false);
     }
@@ -182,6 +200,7 @@ function App() {
     setFinancialData(null);
     setCurrentTicker('');
     setSearchTicker('');
+    setCachedStocks([]); // Clear cached stocks list
     alert('Local cache cleared. Fresh data will be fetched on next search.');
   };
 
@@ -343,6 +362,33 @@ function App() {
             </Button>
           </div>
         </div>
+
+        {/* Cached Stocks */}
+        {cachedStocks.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="text-sm font-medium text-muted-foreground">Recently Viewed (Cached):</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {cachedStocks.map((stock) => (
+                <Button
+                  key={stock}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSearch(stock)}
+                  disabled={loading}
+                  className={`transition-all hover:scale-105 ${
+                    currentTicker === stock 
+                      ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:text-white' 
+                      : ''
+                  }`}
+                >
+                  {stock}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Error Message */}
         {error && (
