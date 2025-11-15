@@ -25,9 +25,18 @@ const PriceChart = ({ data, ticker, timeframe = '1Y' }) => {
     );
   }
 
-  // Calculate price change
-  const firstPrice = data[0]?.close || 0;
-  const lastPrice = data[data.length - 1]?.close || 0;
+  // Use adjusted close (split-adjusted) for accurate historical prices
+  const getPrice = (item) => item?.adjustedClose ?? item?.close ?? 0;
+  
+  // Transform data to use adjusted close for chart display
+  const chartData = data.map(item => ({
+    ...item,
+    displayPrice: getPrice(item) // Use adjusted close for display
+  }));
+  
+  // Calculate price change using adjusted close
+  const firstPrice = getPrice(data[0]);
+  const lastPrice = getPrice(data[data.length - 1]);
   const priceChange = lastPrice - firstPrice;
   const priceChangePercent = firstPrice > 0 ? (priceChange / firstPrice) * 100 : 0;
   const isPositive = priceChange >= 0;
@@ -36,12 +45,18 @@ const PriceChart = ({ data, ticker, timeframe = '1Y' }) => {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      const price = getPrice(data);
       return (
         <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
           <p className="text-sm font-medium">{new Date(label).toLocaleDateString()}</p>
           <p className="text-sm text-blue-600">
-            Close: ${data.close?.toFixed(2)}
+            Adjusted Close: ${price.toFixed(2)}
           </p>
+          {data.close && data.adjustedClose && data.close !== data.adjustedClose && (
+            <p className="text-xs text-muted-foreground">
+              Actual Close: ${data.close.toFixed(2)}
+            </p>
+          )}
           {data.change && (
             <p className={`text-sm ${data.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               Change: {data.change >= 0 ? '+' : ''}${data.change.toFixed(2)} ({data.changePercent?.toFixed(2)}%)
@@ -71,7 +86,7 @@ const PriceChart = ({ data, ticker, timeframe = '1Y' }) => {
       <CardContent>
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data}>
+            <LineChart data={chartData}>
               <XAxis 
                 dataKey="date" 
                 tick={{ fontSize: 12 }}
@@ -80,10 +95,10 @@ const PriceChart = ({ data, ticker, timeframe = '1Y' }) => {
                 height={60}
                 tickFormatter={(value) => {
                   const date = new Date(value);
-                  if (data.length > 520) {
+                  if (chartData.length > 520) {
                     // If data spans more than 520 weeks (10 years), show year format
                     return `${date.getFullYear()}`;
-                  } else if (data.length > 12) {
+                  } else if (chartData.length > 12) {
                     // If data spans more than a year, show quarter/year format
                     const quarter = Math.floor(date.getMonth() / 3) + 1;
                     return `Q${quarter} ${date.getFullYear()}`;
@@ -101,7 +116,7 @@ const PriceChart = ({ data, ticker, timeframe = '1Y' }) => {
               <Tooltip content={<CustomTooltip />} />
               <Line 
                 type="monotone" 
-                dataKey="close" 
+                dataKey="displayPrice"
                 stroke={isPositive ? "#10b981" : "#ef4444"}
                 strokeWidth={2}
                 dot={false}
@@ -125,7 +140,7 @@ const PriceChart = ({ data, ticker, timeframe = '1Y' }) => {
             <div>
               <p className="text-muted-foreground">Range</p>
               <p className="font-semibold">
-                ${Math.min(...data.map(d => d.close)).toFixed(2)} - ${Math.max(...data.map(d => d.close)).toFixed(2)}
+                ${Math.min(...chartData.map(d => d.displayPrice)).toFixed(2)} - ${Math.max(...chartData.map(d => d.displayPrice)).toFixed(2)}
               </p>
             </div>
           </div>

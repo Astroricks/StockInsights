@@ -176,7 +176,7 @@ export const fetchHistoricalData = async (symbol) => {
   if (cached) return cached;
 
   const data = await callAlphaVantage({
-    function: 'TIME_SERIES_DAILY',
+    function: 'TIME_SERIES_DAILY_ADJUSTED',
     symbol: symbol.toUpperCase(),
     outputsize: 'full'
   });
@@ -189,7 +189,10 @@ export const fetchHistoricalData = async (symbol) => {
       high: parseFloat(values['2. high']),
       low: parseFloat(values['3. low']),
       close: parseFloat(values['4. close']),
-      volume: parseInt(values['5. volume'])
+      adjustedClose: parseFloat(values['5. adjusted close']), // Split-adjusted close price
+      volume: parseInt(values['6. volume']),
+      dividendAmount: parseFloat(values['7. dividend amount']) || 0,
+      splitCoefficient: parseFloat(values['8. split coefficient']) || 1
     }))
     .reverse();
 
