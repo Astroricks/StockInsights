@@ -12,14 +12,23 @@ const defaultHeaders = () => ({
 /**
  * Log user's search (fire-and-forget)
  * @param {string} symbol - Stock ticker symbol
+ * @param {string} userId - User ID (Auth0 sub)
  * @param {object} userInfo - User information (name, email)
  */
-export const logSearch = async (symbol, userInfo = {}) => {
+export const logSearch = async (symbol, userId, userInfo = {}) => {
   try {
+    if (!userId) {
+      console.warn('[Backend] Cannot log search: userId is required');
+      return;
+    }
+    
     // Don't await - fire and forget
     fetch(buildUrl('/stocks/search'), {
       method: 'POST',
-      headers: defaultHeaders(),
+      headers: {
+        ...defaultHeaders(),
+        'X-User-Id': userId,  // Send user ID in header
+      },
       credentials: 'include',
       body: JSON.stringify({ 
         symbol,

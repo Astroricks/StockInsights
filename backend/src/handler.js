@@ -24,6 +24,7 @@ const getBody = (event) => {
 
 const handleCorsPreflight = (event) => {
   if (event.httpMethod === 'OPTIONS') {
+    console.log('[CORS] Handling OPTIONS preflight request');
     return {
       statusCode: 204,
       headers: {

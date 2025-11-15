@@ -14,12 +14,6 @@ Globals:
     Handler: src/handler.handler
     MemorySize: 512
     Timeout: 30
-  Api:
-    Cors:
-      AllowMethods: "'GET,POST,OPTIONS'"
-      AllowHeaders: "'Content-Type,Authorization,X-User-Id'"
-      AllowOrigin: !Sub "'${AllowedOrigin}'"
-      AllowCredentials: "'true'"
 
 Resources:
   StockInsightsFunction:
@@ -36,6 +30,11 @@ Resources:
           Properties:
             Path: /stocks/search
             Method: post
+        SearchOptions:
+          Type: Api
+          Properties:
+            Path: /stocks/search
+            Method: options
         OptionsProxy:
           Type: Api
           Properties:

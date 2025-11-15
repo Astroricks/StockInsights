@@ -120,7 +120,7 @@ function App() {
 
       // Fire-and-forget: log search to backend (only for authenticated users)
       if (isAuthenticated && user) {
-        logSearch(normalizedTicker, {
+        logSearch(normalizedTicker, user.sub, {
           name: user.name,
           email: user.email
         });
