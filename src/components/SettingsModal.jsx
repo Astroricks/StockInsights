@@ -124,20 +124,26 @@ const SettingsModal = ({ isOpen, onClose, onApiKeyUpdate, userId }) => {
           {/* Instructions */}
           <Alert>
             <AlertDescription className="text-sm">
-              <p className="font-semibold mb-2">Don't have an API key?</p>
-              <ol className="list-decimal list-inside space-y-1 text-xs">
-                <li>Visit Alpha Vantage's website (link below)</li>  
-                <li>Fill out the form and submit</li>
-                <li>Copy your API key and paste it above</li>
-              </ol>
+              <p className="font-semibold mb-3">Don't have an API key?</p>
               <a
                 href="https://www.alphavantage.co/support/#api-key"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-primary hover:underline mt-2"
               >
-                Get Alpha Vantage Free API Key <ExternalLink className="h-3 w-3" />
+                <Button 
+                  type="button"
+                  variant="default" 
+                  className="w-full mb-3 bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Get Free Alpha Vantage API Key
+                </Button>
               </a>
+              <ol className="list-decimal list-inside space-y-1 text-xs text-muted-foreground">
+                <li>Click the button above to visit Alpha Vantage</li>  
+                <li>Fill out the form and submit</li>
+                <li>Copy your API key and paste it in the field above</li>
+              </ol>
             </AlertDescription>
           </Alert>
 
