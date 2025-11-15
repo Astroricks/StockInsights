@@ -488,9 +488,15 @@ function App() {
       {/* Footer */}
       <footer className="border-t border-border bg-card mt-12">
         <div className="container mx-auto px-4 py-6">
-          <div className="text-center text-sm text-muted-foreground">
+          <div className="text-center text-sm text-muted-foreground space-y-2">
             <p>
               Powered by <a href="https://www.alphavantage.co" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Alpha Vantage API</a>
+            </p>
+            <p>
+              Questions or feedback? Email us at{' '}
+              <a href="mailto:prismfininsights@gmail.com" className="text-primary hover:underline">
+                prismfininsights@gmail.com
+              </a>
             </p>
           </div>
         </div>
