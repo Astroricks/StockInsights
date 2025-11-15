@@ -175,13 +175,13 @@ export const fetchHistoricalData = async (symbol) => {
   const cached = getCachedData(symbol, 'historical');
   if (cached) return cached;
 
+  // Use WEEKLY_ADJUSTED (free tier) instead of DAILY_ADJUSTED (premium)
   const data = await callAlphaVantage({
-    function: 'TIME_SERIES_DAILY_ADJUSTED',
-    symbol: symbol.toUpperCase(),
-    outputsize: 'full'
+    function: 'TIME_SERIES_WEEKLY_ADJUSTED',
+    symbol: symbol.toUpperCase()
   });
 
-  const timeSeries = data['Time Series (Daily)'] || {};
+  const timeSeries = data['Weekly Adjusted Time Series'] || {};
   const historicalData = Object.entries(timeSeries)
     .map(([date, values]) => ({
       date,
@@ -191,8 +191,7 @@ export const fetchHistoricalData = async (symbol) => {
       close: parseFloat(values['4. close']),
       adjustedClose: parseFloat(values['5. adjusted close']), // Split-adjusted close price
       volume: parseInt(values['6. volume']),
-      dividendAmount: parseFloat(values['7. dividend amount']) || 0,
-      splitCoefficient: parseFloat(values['8. split coefficient']) || 1
+      dividendAmount: parseFloat(values['7. dividend amount']) || 0
     }))
     .reverse();
 
