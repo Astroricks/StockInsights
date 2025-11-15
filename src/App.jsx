@@ -3,7 +3,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { Button } from '@/components/ui/button';
 import SignInButton from './components/SignInButton';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2, TrendingUp, Settings } from 'lucide-react';
+import { Search, Loader2, TrendingUp, Settings, Info } from 'lucide-react';
 
 // Import chart components
 import PriceChart from './components/PriceChart';
@@ -267,6 +267,22 @@ function App() {
                 <span className="text-blue-800 dark:text-blue-200">
                   <strong>Try IBM Demo:</strong> Search "IBM" to see the app in action! Sign in and add your free Alpha Vantage API key to search other stocks.
                 </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* API Rate Limit Banner */}
+      {isAuthenticated && apiKeyConfigured && (
+        <div className="bg-sky-50 dark:bg-sky-950 border-b border-sky-200 dark:border-sky-800">
+          <div className="container mx-auto px-4 py-3">
+            <div className="flex items-start gap-3 text-sm">
+              <Info className="h-5 w-5 text-sky-600 dark:text-sky-400 flex-shrink-0 mt-0.5" />
+              <div className="text-sky-900 dark:text-sky-100">
+                <strong className="font-semibold">Free API Key Limits:</strong> Alpha Vantage's free tier allows <strong>25 API calls per day</strong>. 
+                Each stock search uses approximately <strong>8 API calls</strong>, so you can search about <strong>3 stocks daily</strong>. 
+                Data is cached for 24 hours to help you stay within limits.
               </div>
             </div>
           </div>
