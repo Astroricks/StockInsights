@@ -300,7 +300,7 @@ function App() {
               <Info className="h-5 w-5 text-sky-600 dark:text-sky-400 flex-shrink-0 mt-0.5" />
               <div className="text-sky-900 dark:text-sky-100">
                 <strong className="font-semibold">Free API Key Limits:</strong> Alpha Vantage's free tier allows <strong>25 API calls per day</strong>. 
-                Each stock search uses approximately <strong>8 API calls</strong>, so you can search about <strong>3 stocks daily</strong>. 
+                Each stock search typically uses <strong>5-7 API calls</strong> (depending on available data), so you can search about <strong>3-5 stocks daily</strong>. 
                 Data is cached for 24 hours to help you stay within limits.
               </div>
             </div>
