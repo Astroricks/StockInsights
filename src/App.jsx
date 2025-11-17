@@ -118,7 +118,7 @@ function App() {
       setCurrentTicker(normalizedTicker);
       setSearchTicker(normalizedTicker);
       setLoading(true);
-
+      
       // Check if data is already cached
       const isCached = isStockCached(normalizedTicker);
 
@@ -233,14 +233,14 @@ function App() {
             <div className="flex items-center gap-2">
               {/* Settings */}
               {isAuthenticated && (
-                <Button 
-                  variant="ghost" 
+            <Button
+              variant="ghost"
                   size="sm"
-                  onClick={() => setShowSettings(true)}
+              onClick={() => setShowSettings(true)}
                   title="API Key Settings"
-                >
+            >
                   <Settings className="h-4 w-4" />
-                </Button>
+            </Button>
               )}
               {/* Sign In / Sign Out */}
               <SignInButton />
@@ -252,13 +252,13 @@ function App() {
       {/* API Key Configuration Banner */}
       {isAuthenticated && !apiKeyConfigured && (
         <div className="bg-orange-50 dark:bg-orange-950 border-b border-orange-200 dark:border-orange-800">
-          <div className="container mx-auto px-4 py-3">
+        <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between text-sm flex-wrap gap-2">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
                 <span className="text-orange-800 dark:text-orange-200">
                   <strong>API Key Required:</strong> Please configure your Alpha Vantage API key to search stocks.
-                </span>
+              </span>
               </div>
               <Button
                 variant="outline"
@@ -299,10 +299,10 @@ function App() {
                 <strong className="font-semibold">Free API Key Limits:</strong> Alpha Vantage's free tier allows <strong>25 API calls per day</strong>. 
                 Each stock search typically uses <strong>5-7 API calls</strong> (depending on available data), so you can search about <strong>3-5 stocks daily</strong>. 
                 Data is cached for 24 hours to help you stay within limits.
-              </div>
             </div>
           </div>
         </div>
+      </div>
       )}
 
       {/* Search and Controls */}
@@ -512,11 +512,11 @@ function App() {
             <div className="text-sm text-muted-foreground mb-8">
               <p className="mb-2 font-semibold text-lg text-foreground">Try the Demo Stock:</p>
               <div className="flex flex-wrap justify-center gap-2">
-                <StockButton
+                  <StockButton
                   ticker="IBM"
-                  onSearch={handleSearch}
+                    onSearch={handleSearch}
                   disabled={loading || authLoading}
-                />
+                  />
               </div>
             </div>
 
@@ -563,7 +563,7 @@ function App() {
       </footer>
 
       {/* Settings Modal */}
-      <SettingsModal
+      <SettingsModal 
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         onApiKeyUpdate={handleApiKeyUpdate}

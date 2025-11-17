@@ -18,7 +18,7 @@ const RevenueChart = ({ data, timeframe = 'Quarterly' }) => {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span>Revenue</span>
+            <span>Revenue</span>
               <InfoButton term="Revenue" />
             </div>
             <span className="text-sm text-muted-foreground">{timeframe}</span>

@@ -493,55 +493,109 @@ export const fetchEarningsData = async (symbol) => {
   return result;
 };
 
-// Fetch dividend history
-export const fetchDividendHistory = async (symbol) => {
+// Extract dividends from historical data (saves 1 API call)
+const extractDividendsFromHistorical = (historicalData) => {
+  if (!historicalData || historicalData.length === 0) {
+    return { annual: [], quarterly: [] };
+  }
+
+  // Helper to parse date
+  const parseDate = (dateStr) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? null : date;
+  };
+
+  // Filter entries with dividends and parse dates
+  const dividendEntries = historicalData
+    .filter(item => item.dividendAmount && item.dividendAmount > 0)
+    .map(item => ({
+      date: item.date,
+      dividendAmount: item.dividendAmount,
+      parsedDate: parseDate(item.date)
+    }))
+    .filter(item => item.parsedDate !== null)
+    .sort((a, b) => b.parsedDate - a.parsedDate); // Newest first
+
+  if (dividendEntries.length === 0) {
+    return { annual: [], quarterly: [] };
+  }
+
+  // Set up date filters
+  const today = new Date();
+  today.setHours(23, 59, 59, 999); // End of today
+  const fiveYearsAgo = new Date();
+  fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+  fiveYearsAgo.setHours(0, 0, 0, 0); // Start of day
+  const currentYear = today.getFullYear();
+
+  // Filter quarterly to last 5 years
+  const quarterly = dividendEntries
+    .filter(entry => {
+      const year = entry.parsedDate.getFullYear();
+      return entry.parsedDate >= fiveYearsAgo && 
+             entry.parsedDate <= today && 
+             year >= 1900 && 
+             year <= currentYear;
+    })
+    .slice(0, 40) // Limit to 40 most recent within 5 years
+    .map(entry => ({
+      date: entry.date,
+      dividendAmount: entry.dividendAmount,
+      declarationDate: null // Not available from weekly data
+    }))
+    .reverse(); // Reverse to show oldest to newest for chart
+
+  // Aggregate ALL dividends into annual
+  const annualMap = new Map();
+  dividendEntries
+    .filter(entry => {
+      const year = entry.parsedDate.getFullYear();
+      return entry.parsedDate <= today && 
+             year >= 1900 && 
+             year <= currentYear;
+    })
+    .forEach(entry => {
+      const year = entry.parsedDate.getFullYear();
+      if (!annualMap.has(year)) {
+        annualMap.set(year, { year, totalDividend: 0, dividendCount: 0 });
+      }
+      const yearData = annualMap.get(year);
+      yearData.totalDividend += entry.dividendAmount;
+      yearData.dividendCount += 1;
+    });
+
+  // Convert to array, sort by year (oldest to newest), and keep last 20 years
+  const annual = Array.from(annualMap.values())
+    .sort((a, b) => a.year - b.year)
+    .slice(-20); // Keep last 20 years
+
+  return {
+    annual,
+    quarterly
+  };
+};
+
+// Fetch dividend history (now extracted from historical data to save API calls)
+export const fetchDividendHistory = async (symbol, historicalData = null) => {
   try {
     const cached = getCachedData(symbol, 'dividends');
     if (cached) return cached;
 
-    const data = await callAlphaVantage({
-      function: 'DIVIDENDS',
-      symbol: symbol.toUpperCase()
-    });
+    // If historical data is provided, extract dividends from it
+    // Otherwise, fetch historical data first (it's already cached from fetchAllFinancialData)
+    let histData = historicalData;
+    if (!histData) {
+      histData = await fetchHistoricalData(symbol);
+    }
 
-    const dividends = data.data || [];
-    
-    // Process quarterly dividends
-    const quarterly = dividends.slice(0, 40).reverse().map(div => ({
-      date: div.ex_dividend_date || div.payment_date,
-      dividendAmount: parseFloat(div.amount) || 0,
-      declarationDate: div.declaration_date
-    }));
-
-    // Aggregate quarterly into annual
-    const annualMap = new Map();
-    dividends.forEach(div => {
-      const date = div.ex_dividend_date || div.payment_date;
-      if (date) {
-        const year = new Date(date).getFullYear();
-        if (!annualMap.has(year)) {
-          annualMap.set(year, { year, totalDividend: 0, dividendCount: 0 });
-        }
-        const yearData = annualMap.get(year);
-        yearData.totalDividend += parseFloat(div.amount) || 0;
-        yearData.dividendCount += 1;
-      }
-    });
-
-    // Convert to array and sort by year (oldest to newest)
-    const annual = Array.from(annualMap.values())
-      .sort((a, b) => a.year - b.year)
-      .slice(-20); // Keep last 20 years
-    
-    const result = {
-      annual,
-      quarterly
-    };
+    // Extract dividends from historical data
+    const result = extractDividendsFromHistorical(histData);
 
     setCachedData(symbol, 'dividends', result);
     return result;
   } catch (error) {
-    console.warn('[AlphaVantage] Dividend fetch failed:', error.message);
+    console.warn('[AlphaVantage] Dividend extraction failed:', error.message);
     return { annual: [], quarterly: [] };
   }
 };
@@ -549,8 +603,11 @@ export const fetchDividendHistory = async (symbol) => {
 // Fetch all financial data
 export const fetchAllFinancialData = async (symbol) => {
   try {
+    // Fetch historical data first (needed for dividend extraction)
+    const historicalData = await fetchHistoricalData(symbol);
+    
+    // Fetch all other data in parallel, and extract dividends from historical data
     const [
-      historicalData,
       incomeStatement,
       cashFlowStatement,
       balanceSheet,
@@ -558,14 +615,13 @@ export const fetchAllFinancialData = async (symbol) => {
       earningsData,
       dividendsData
     ] = await Promise.all([
-      fetchHistoricalData(symbol),
       fetchIncomeStatement(symbol),
       fetchCashFlowStatement(symbol),
       fetchBalanceSheet(symbol),
       fetchCompanyOverview(symbol),
       fetchEarningsData(symbol),
-      fetchDividendHistory(symbol).catch(err => {
-        console.warn(`Dividend fetch failed for ${symbol}:`, err.message);
+      fetchDividendHistory(symbol, historicalData).catch(err => {
+        console.warn(`Dividend extraction failed for ${symbol}:`, err.message);
         return { annual: [], quarterly: [] };
       })
     ]);
