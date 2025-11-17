@@ -318,32 +318,101 @@ export const fetchBalanceSheet = async (symbol) => {
   const reportedCurrency = annualReports[0]?.reportedCurrency || quarterlyReports[0]?.reportedCurrency || 'USD';
 
   const annualData = filterIncompleteCurrentYear(
-    annualReports.map(report => ({
-      date: report.fiscalDateEnding,
-      period: 'annual',
-      reportedCurrency: report.reportedCurrency || reportedCurrency,
-      totalAssets: parseInt(report.totalAssets) || 0,
-      totalLiabilities: parseInt(report.totalLiabilities) || 0,
-      cashAndCashEquivalents: parseInt(report.cashAndCashEquivalentsAtCarryingValue) || 0,
-      shortTermDebt: parseInt(report.shortTermDebt) || 0,
-      longTermDebt: parseInt(report.longTermDebtNoncurrent) || 0,
-      totalShareholderEquity: parseInt(report.totalShareholderEquity) || 0,
-      commonStockSharesOutstanding: parseFloat(report.commonStockSharesOutstanding) || 0
-    })).reverse(),
+    annualReports.map(report => {
+      // Use cashAndShortTermInvestments if available (most comprehensive), otherwise sum
+      const cashAndShortTerm = parseInt(report.cashAndShortTermInvestments) || 0;
+      const cashAndEquivalents = parseInt(report.cashAndCashEquivalentsAtCarryingValue) || 0;
+      const shortTermInvestments = parseInt(report.shortTermInvestments) || 0;
+      const cashValue = cashAndShortTerm || (cashAndEquivalents + shortTermInvestments);
+      
+      // Try to get comprehensive debt value
+      // Use shortLongTermDebtTotal if available (most comprehensive), otherwise sum individual components
+      const shortLongTermDebtTotal = parseInt(report.shortLongTermDebtTotal) || 0;
+      const shortTermDebt = parseInt(report.shortTermDebt) || 0;
+      // Handle "None" string values for long-term debt
+      const longTermDebtNoncurrent = (report.longTermDebtNoncurrent === "None" || !report.longTermDebtNoncurrent) 
+        ? 0 
+        : parseInt(report.longTermDebtNoncurrent) || 0;
+      const currentLongTermDebt = (report.currentLongTermDebt === "None" || !report.currentLongTermDebt)
+        ? 0
+        : parseInt(report.currentLongTermDebt) || 0;
+      const longTermDebt = (report.longTermDebt === "None" || !report.longTermDebt)
+        ? 0
+        : parseInt(report.longTermDebt) || 0;
+      
+      // Calculate total debt: prefer shortLongTermDebtTotal, otherwise sum all debt components
+      const totalDebt = shortLongTermDebtTotal || (shortTermDebt + longTermDebtNoncurrent + currentLongTermDebt + longTermDebt);
+      
+      return {
+        date: report.fiscalDateEnding,
+        period: 'annual',
+        reportedCurrency: report.reportedCurrency || reportedCurrency,
+        totalAssets: parseInt(report.totalAssets) || 0,
+        totalLiabilities: parseInt(report.totalLiabilities) || 0,
+        cashAndCashEquivalents: cashValue, // Includes cash, cash equivalents, and short-term investments
+        shortTermDebt: shortTermDebt,
+        longTermDebt: longTermDebtNoncurrent + currentLongTermDebt + longTermDebt, // Sum all long-term debt components
+        totalDebt: totalDebt, // Use comprehensive total debt
+        totalShareholderEquity: parseInt(report.totalShareholderEquity) || 0,
+        commonStockSharesOutstanding: parseFloat(report.commonStockSharesOutstanding) || 0
+      };
+    }).reverse(),
     true
   );
 
   const quarterlyData = quarterlyReports.slice(0, 20).map(report => {
-    const cashValue = parseInt(report.cashAndCashEquivalentsAtCarryingValue) || 0;
+    // Use cashAndShortTermInvestments if available (most comprehensive), otherwise sum
+    const cashAndShortTerm = parseInt(report.cashAndShortTermInvestments) || 0;
+    const cashAndEquivalents = parseInt(report.cashAndCashEquivalentsAtCarryingValue) || 0;
+    const shortTermInvestments = parseInt(report.shortTermInvestments) || 0;
+    const cashValue = cashAndShortTerm || (cashAndEquivalents + shortTermInvestments);
+    
+    // Try to get comprehensive debt value
+    // Use shortLongTermDebtTotal if available (most comprehensive), otherwise sum individual components
+    const shortLongTermDebtTotal = parseInt(report.shortLongTermDebtTotal) || 0;
+    const shortTermDebt = parseInt(report.shortTermDebt) || 0;
+    // Handle "None" string values for long-term debt
+    const longTermDebtNoncurrent = (report.longTermDebtNoncurrent === "None" || !report.longTermDebtNoncurrent) 
+      ? 0 
+      : parseInt(report.longTermDebtNoncurrent) || 0;
+    const currentLongTermDebt = (report.currentLongTermDebt === "None" || !report.currentLongTermDebt)
+      ? 0
+      : parseInt(report.currentLongTermDebt) || 0;
+    const longTermDebt = (report.longTermDebt === "None" || !report.longTermDebt)
+      ? 0
+      : parseInt(report.longTermDebt) || 0;
+    
+    // Calculate total debt: prefer shortLongTermDebtTotal, otherwise sum all debt components
+    const totalDebt = shortLongTermDebtTotal || (shortTermDebt + longTermDebtNoncurrent + currentLongTermDebt + longTermDebt);
+    
+    // Debug log for IBM to verify calculations (development only)
+    if (import.meta.env.DEV && symbol.toUpperCase() === 'IBM' && report.fiscalDateEnding === '2025-09-30') {
+      console.log(`[BalanceSheet] IBM Q3 2025 Final Values:`, {
+        cashAndShortTermInvestments: report.cashAndShortTermInvestments,
+        cashValue: cashValue,
+        cashInBillions: (cashValue / 1000000000).toFixed(2),
+        shortLongTermDebtTotal: report.shortLongTermDebtTotal,
+        totalDebt: totalDebt,
+        debtInBillions: (totalDebt / 1000000000).toFixed(2),
+        shortTermDebt: shortTermDebt,
+        longTermDebtComponents: {
+          longTermDebtNoncurrent: report.longTermDebtNoncurrent,
+          currentLongTermDebt: report.currentLongTermDebt,
+          longTermDebt: report.longTermDebt
+        }
+      });
+    }
+    
     return {
       date: report.fiscalDateEnding,
       period: 'quarter',
       reportedCurrency: report.reportedCurrency || reportedCurrency,
       totalAssets: parseInt(report.totalAssets) || 0,
       totalLiabilities: parseInt(report.totalLiabilities) || 0,
-      cashAndCashEquivalents: cashValue,
-      shortTermDebt: parseInt(report.shortTermDebt) || 0,
-      longTermDebt: parseInt(report.longTermDebtNoncurrent) || 0,
+      cashAndCashEquivalents: cashValue, // Includes cash, cash equivalents, and short-term investments
+      shortTermDebt: shortTermDebt,
+      longTermDebt: longTermDebtNoncurrent + currentLongTermDebt + longTermDebt, // Sum all long-term debt components
+      totalDebt: totalDebt, // Use comprehensive total debt
       totalShareholderEquity: parseInt(report.totalShareholderEquity) || 0,
       commonStockSharesOutstanding: parseFloat(report.commonStockSharesOutstanding) || 0
     };

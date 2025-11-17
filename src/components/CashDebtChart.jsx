@@ -36,7 +36,8 @@ const CashDebtChart = ({ data, timeframe = 'Quarterly' }) => {
   // Format data for chart
   const chartData = sourceData.map(item => {
     const cash = item.cash || item.cashAndCashEquivalents || 0;
-    const totalDebt = (item.shortTermDebt || 0) + (item.longTermDebt || 0);
+    // Use totalDebt if available (includes all debt), otherwise sum shortTerm + longTerm
+    const totalDebt = item.totalDebt || ((item.shortTermDebt || 0) + (item.longTermDebt || 0));
     
     return {
       date: item.date || item.calendarYear,
