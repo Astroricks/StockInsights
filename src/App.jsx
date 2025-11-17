@@ -468,6 +468,7 @@ function App() {
                 <EPSChart 
                   data={financialData.earningsData} 
                   timeframe={timeframe === 'quarter' ? 'Quarterly' : timeframe === 'annual' ? 'Annually' : 'Quarterly (TTM)'}
+                  currency={financialData.profile?.Currency}
                 />
               </div>
 

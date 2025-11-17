@@ -8,6 +8,10 @@ const CashDebtChart = ({ data, timeframe = 'Quarterly' }) => {
   const isAnnual = timeframe.toLowerCase().includes('annual');
   const sourceData = isAnnual ? (data?.annual || []) : (data?.quarterly || []);
   
+  // Get currency from data (first item or fallback)
+  const reportedCurrency = sourceData[0]?.reportedCurrency || data?.currency || 'USD';
+  const isUSD = reportedCurrency === 'USD';
+  
   if (!sourceData || sourceData.length === 0) {
     return (
       <Card>
@@ -55,27 +59,31 @@ const CashDebtChart = ({ data, timeframe = 'Quarterly' }) => {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      const currencySymbol = isUSD ? '$' : reportedCurrency + ' ';
       return (
         <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
           <p className="text-sm font-medium">{data.quarter}</p>
+          {!isUSD && (
+            <p className="text-xs text-muted-foreground mb-1">Currency: {reportedCurrency}</p>
+          )}
           <p className="text-sm text-green-600">
-            Cash: ${data.cash.toFixed(2)}B
+            Cash: {currencySymbol}{data.cash.toFixed(2)}B
           </p>
           <p className="text-sm text-red-600">
-            Total Debt: ${data.debt.toFixed(2)}B
+            Total Debt: {currencySymbol}{data.debt.toFixed(2)}B
           </p>
           {data.shortTermDebt > 0 && (
             <p className="text-xs text-muted-foreground ml-2">
-              Short-term: ${data.shortTermDebt.toFixed(2)}B
+              Short-term: {currencySymbol}{data.shortTermDebt.toFixed(2)}B
             </p>
           )}
           {data.longTermDebt > 0 && (
             <p className="text-xs text-muted-foreground ml-2">
-              Long-term: ${data.longTermDebt.toFixed(2)}B
+              Long-term: {currencySymbol}{data.longTermDebt.toFixed(2)}B
             </p>
           )}
           <p className="text-sm text-muted-foreground">
-            Net: ${(data.cash - data.debt).toFixed(2)}B
+            Net: {currencySymbol}{(data.cash - data.debt).toFixed(2)}B
           </p>
         </div>
       );
@@ -90,6 +98,11 @@ const CashDebtChart = ({ data, timeframe = 'Quarterly' }) => {
           <div className="flex items-center gap-2">
             <span>Cash & Debt</span>
             <InfoButton term="Cash & Debt" />
+            {!isUSD && (
+              <span className="text-xs text-muted-foreground" title={`Values reported in ${reportedCurrency}`}>
+                ({reportedCurrency})
+              </span>
+            )}
             {netCash !== 0 && (
               <span className={`text-sm ${netCash >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 Net: {netCash >= 0 ? '$' : '-$'}{Math.abs(netCash / 1000000000).toFixed(2)}B

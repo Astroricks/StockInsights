@@ -8,6 +8,10 @@ const RevenueChart = ({ data, timeframe = 'Quarterly' }) => {
   const isAnnual = timeframe.toLowerCase().includes('annual');
   const sourceData = isAnnual ? (data?.annual || []) : (data?.quarterly || []);
   
+  // Get currency from data
+  const reportedCurrency = sourceData[0]?.reportedCurrency || data?.currency || 'USD';
+  const isUSD = reportedCurrency === 'USD';
+  
   if (!sourceData || sourceData.length === 0) {
     return (
       <Card>
@@ -46,11 +50,15 @@ const RevenueChart = ({ data, timeframe = 'Quarterly' }) => {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      const currencySymbol = isUSD ? '$' : reportedCurrency + ' ';
       return (
         <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
           <p className="text-sm font-medium">{data.quarter}</p>
+          {!isUSD && (
+            <p className="text-xs text-muted-foreground mb-1">Currency: {reportedCurrency}</p>
+          )}
           <p className="text-sm text-orange-600">
-            Revenue: ${(data.revenue / 1000000000).toFixed(2)}B
+            Revenue: {currencySymbol}{(data.revenue / 1000000000).toFixed(2)}B
           </p>
         </div>
       );
@@ -65,6 +73,11 @@ const RevenueChart = ({ data, timeframe = 'Quarterly' }) => {
           <div className="flex items-center gap-2">
             <span>Revenue</span>
             <InfoButton term="Revenue" />
+            {!isUSD && (
+              <span className="text-xs text-muted-foreground" title={`Values reported in ${reportedCurrency}`}>
+                ({reportedCurrency})
+              </span>
+            )}
             {growth !== 0 && (
               <span className={`text-sm ${growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {growth >= 0 ? '+' : ''}{growth.toFixed(1)}%
@@ -87,7 +100,7 @@ const RevenueChart = ({ data, timeframe = 'Quarterly' }) => {
               />
               <YAxis 
                 tick={{ fontSize: 12 }}
-                tickFormatter={(value) => `$${value.toFixed(1)}B`}
+                tickFormatter={(value) => `${isUSD ? '$' : reportedCurrency + ' '}${value.toFixed(1)}B`}
               />
               <Tooltip content={<CustomTooltip />} />
               <Bar 
@@ -102,7 +115,9 @@ const RevenueChart = ({ data, timeframe = 'Quarterly' }) => {
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
               <p className="text-muted-foreground">Latest {isAnnual ? 'Year' : 'Quarter'}</p>
-              <p className="font-semibold">${(latestRevenue / 1000000000).toFixed(2)}B</p>
+              <p className="font-semibold">
+                {isUSD ? '$' : reportedCurrency + ' '}{(latestRevenue / 1000000000).toFixed(2)}B
+              </p>
             </div>
             <div>
               <p className="text-muted-foreground">{isAnnual ? 'YoY' : 'QoQ'} Growth</p>

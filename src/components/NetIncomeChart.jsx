@@ -8,6 +8,10 @@ const NetIncomeChart = ({ data, timeframe = 'Quarterly' }) => {
   const isAnnual = timeframe.toLowerCase().includes('annual');
   const sourceData = isAnnual ? (data?.annual || []) : (data?.quarterly || []);
   
+  // Get currency from data
+  const reportedCurrency = sourceData[0]?.reportedCurrency || data?.currency || 'USD';
+  const isUSD = reportedCurrency === 'USD';
+  
   if (!sourceData || sourceData.length === 0) {
     return (
       <Card>
@@ -49,11 +53,15 @@ const NetIncomeChart = ({ data, timeframe = 'Quarterly' }) => {
       const data = payload[0].payload;
       const value = data.netIncome;
       const isPositive = value >= 0;
+      const currencySymbol = isUSD ? '$' : reportedCurrency + ' ';
       return (
         <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
           <p className="text-sm font-medium">{data.quarter}</p>
+          {!isUSD && (
+            <p className="text-xs text-muted-foreground mb-1">Currency: {reportedCurrency}</p>
+          )}
           <p className={`text-sm ${isPositive ? 'text-orange-600' : 'text-red-600'}`}>
-            Net Income: {isPositive ? '$' : '-$'}{Math.abs(value / 1000000).toFixed(0)}M
+            Net Income: {isPositive ? currencySymbol : '-' + currencySymbol}{Math.abs(value / 1000000).toFixed(0)}M
           </p>
         </div>
       );
@@ -68,6 +76,11 @@ const NetIncomeChart = ({ data, timeframe = 'Quarterly' }) => {
           <div className="flex items-center gap-2">
             <span>Net Income</span>
             <InfoButton term="Net Income" />
+            {!isUSD && (
+              <span className="text-xs text-muted-foreground" title={`Values reported in ${reportedCurrency}`}>
+                ({reportedCurrency})
+              </span>
+            )}
             {growth !== 0 && (
               <span className={`text-sm ${growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {growth >= 0 ? '+' : ''}{growth.toFixed(1)}%
@@ -90,7 +103,7 @@ const NetIncomeChart = ({ data, timeframe = 'Quarterly' }) => {
               />
               <YAxis 
                 tick={{ fontSize: 12 }}
-                tickFormatter={(value) => `$${value.toFixed(0)}M`}
+                tickFormatter={(value) => `${isUSD ? '$' : reportedCurrency + ' '}${value.toFixed(0)}M`}
               />
               <Tooltip content={<CustomTooltip />} />
               <Bar 
@@ -112,7 +125,7 @@ const NetIncomeChart = ({ data, timeframe = 'Quarterly' }) => {
             <div>
               <p className="text-muted-foreground">Latest {isAnnual ? 'Year' : 'Quarter'}</p>
               <p className={`font-semibold ${latestNetIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {latestNetIncome >= 0 ? '$' : '-$'}{Math.abs(latestNetIncome / 1000000).toFixed(0)}M
+                {latestNetIncome >= 0 ? (isUSD ? '$' : reportedCurrency + ' ') : '-' + (isUSD ? '$' : reportedCurrency + ' ')}{Math.abs(latestNetIncome / 1000000).toFixed(0)}M
               </p>
             </div>
             <div>

@@ -3,10 +3,14 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { formatTimeframeLabel } from '../utils/fetchAlphaVantage';
 import InfoButton from './InfoButton';
 
-const EPSChart = ({ data, timeframe = 'Quarterly' }) => {
+const EPSChart = ({ data, timeframe = 'Quarterly', currency = 'USD' }) => {
   // Select appropriate data based on timeframe
   const isAnnual = timeframe.toLowerCase().includes('annual');
   const sourceData = isAnnual ? (data?.annual || []) : (data?.quarterly || []);
+  
+  // Get currency from prop or data
+  const reportedCurrency = currency || data?.currency || 'USD';
+  const isUSD = reportedCurrency === 'USD';
   
   if (!sourceData || sourceData.length === 0) {
     return (
@@ -55,21 +59,25 @@ const EPSChart = ({ data, timeframe = 'Quarterly' }) => {
       const surprise = data.surprise;
       const estimatedEPS = typeof data.estimatedEPS === 'number' ? data.estimatedEPS : parseFloat(data.estimatedEPS);
       const surpriseValue = typeof surprise === 'number' ? surprise : parseFloat(surprise);
+      const currencySymbol = isUSD ? '$' : reportedCurrency + ' ';
       
       return (
         <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
           <p className="text-sm font-medium">{data.quarter}</p>
+          {!isUSD && (
+            <p className="text-xs text-muted-foreground mb-1">Currency: {reportedCurrency}</p>
+          )}
           <p className={`text-sm ${isPositive ? 'text-yellow-600' : 'text-red-600'}`}>
-            Reported EPS: {isPositive ? '$' : '-$'}{Math.abs(value).toFixed(2)}
+            Reported EPS: {isPositive ? currencySymbol : '-' + currencySymbol}{Math.abs(value).toFixed(2)}
           </p>
           {!isNaN(estimatedEPS) && (
             <p className="text-sm text-muted-foreground">
-              Estimated: ${estimatedEPS.toFixed(2)}
+              Estimated: {currencySymbol}{estimatedEPS.toFixed(2)}
             </p>
           )}
           {!isNaN(surpriseValue) && (
             <p className={`text-sm ${surpriseValue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              Surprise: {surpriseValue >= 0 ? '+$' : '-$'}{Math.abs(surpriseValue).toFixed(2)}
+              Surprise: {surpriseValue >= 0 ? '+' + currencySymbol : '-' + currencySymbol}{Math.abs(surpriseValue).toFixed(2)}
             </p>
           )}
           {data.reportedDate && (
@@ -90,6 +98,11 @@ const EPSChart = ({ data, timeframe = 'Quarterly' }) => {
           <div className="flex items-center gap-2">
             <span>EPS</span>
             <InfoButton term="EPS" />
+            {!isUSD && (
+              <span className="text-xs text-muted-foreground" title={`Values reported in ${reportedCurrency}`}>
+                ({reportedCurrency})
+              </span>
+            )}
             {growth !== 0 && (
               <span className={`text-sm ${growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {growth >= 0 ? '+' : ''}{growth.toFixed(1)}%
@@ -112,7 +125,7 @@ const EPSChart = ({ data, timeframe = 'Quarterly' }) => {
               />
               <YAxis 
                 tick={{ fontSize: 12 }}
-                tickFormatter={(value) => `$${value.toFixed(2)}`}
+                tickFormatter={(value) => `${isUSD ? '$' : reportedCurrency + ' '}${value.toFixed(2)}`}
               />
               <Tooltip content={<CustomTooltip />} />
               <Bar 
@@ -134,7 +147,7 @@ const EPSChart = ({ data, timeframe = 'Quarterly' }) => {
             <div>
               <p className="text-muted-foreground">Latest {isAnnual ? 'Year' : 'Quarter'}</p>
               <p className={`font-semibold ${latestEPS >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {latestEPS >= 0 ? '$' : '-$'}{Math.abs(latestEPS).toFixed(2)}
+                {latestEPS >= 0 ? (isUSD ? '$' : reportedCurrency + ' ') : '-' + (isUSD ? '$' : reportedCurrency + ' ')}{Math.abs(latestEPS).toFixed(2)}
               </p>
             </div>
             <div>

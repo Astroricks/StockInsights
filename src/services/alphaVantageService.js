@@ -212,10 +212,14 @@ export const fetchIncomeStatement = async (symbol) => {
   const annualReports = data.annualReports || [];
   const quarterlyReports = data.quarterlyReports || [];
 
+  // Get currency from first report
+  const reportedCurrency = annualReports[0]?.reportedCurrency || quarterlyReports[0]?.reportedCurrency || 'USD';
+
   const annualData = filterIncompleteCurrentYear(
     annualReports.map(report => ({
       date: report.fiscalDateEnding,
       period: 'annual',
+      reportedCurrency: report.reportedCurrency || reportedCurrency,
       revenue: parseInt(report.totalRevenue) || 0,
       costOfRevenue: parseInt(report.costOfRevenue) || 0,
       grossProfit: parseInt(report.grossProfit) || 0,
@@ -230,6 +234,7 @@ export const fetchIncomeStatement = async (symbol) => {
   const quarterlyData = quarterlyReports.slice(0, 20).map(report => ({
     date: report.fiscalDateEnding,
     period: 'quarter',
+    reportedCurrency: report.reportedCurrency || reportedCurrency,
     revenue: parseInt(report.totalRevenue) || 0,
     costOfRevenue: parseInt(report.costOfRevenue) || 0,
     grossProfit: parseInt(report.grossProfit) || 0,
@@ -241,7 +246,8 @@ export const fetchIncomeStatement = async (symbol) => {
 
   const result = {
     annual: annualData,
-    quarterly: quarterlyData
+    quarterly: quarterlyData,
+    currency: reportedCurrency
   };
 
   setCachedData(symbol, 'income', result);
@@ -261,10 +267,14 @@ export const fetchCashFlowStatement = async (symbol) => {
   const annualReports = data.annualReports || [];
   const quarterlyReports = data.quarterlyReports || [];
 
+  // Get currency from first report
+  const reportedCurrency = annualReports[0]?.reportedCurrency || quarterlyReports[0]?.reportedCurrency || 'USD';
+
   const annualData = filterIncompleteCurrentYear(
     annualReports.map(report => ({
       date: report.fiscalDateEnding,
       period: 'annual',
+      reportedCurrency: report.reportedCurrency || reportedCurrency,
       operatingCashFlow: parseInt(report.operatingCashflow) || 0,
       capitalExpenditures: parseInt(report.capitalExpenditures) || 0,
       freeCashFlow: (parseInt(report.operatingCashflow) || 0) - Math.abs(parseInt(report.capitalExpenditures) || 0)
@@ -275,6 +285,7 @@ export const fetchCashFlowStatement = async (symbol) => {
   const quarterlyData = quarterlyReports.slice(0, 20).map(report => ({
     date: report.fiscalDateEnding,
     period: 'quarter',
+    reportedCurrency: report.reportedCurrency || reportedCurrency,
     operatingCashFlow: parseInt(report.operatingCashflow) || 0,
     capitalExpenditures: parseInt(report.capitalExpenditures) || 0,
     freeCashFlow: (parseInt(report.operatingCashflow) || 0) - Math.abs(parseInt(report.capitalExpenditures) || 0)
@@ -282,7 +293,8 @@ export const fetchCashFlowStatement = async (symbol) => {
 
   const result = {
     annual: annualData,
-    quarterly: quarterlyData
+    quarterly: quarterlyData,
+    currency: reportedCurrency
   };
 
   setCachedData(symbol, 'cashflow', result);
@@ -302,10 +314,14 @@ export const fetchBalanceSheet = async (symbol) => {
   const annualReports = data.annualReports || [];
   const quarterlyReports = data.quarterlyReports || [];
 
+  // Get currency from first report (all reports should have same currency)
+  const reportedCurrency = annualReports[0]?.reportedCurrency || quarterlyReports[0]?.reportedCurrency || 'USD';
+
   const annualData = filterIncompleteCurrentYear(
     annualReports.map(report => ({
       date: report.fiscalDateEnding,
       period: 'annual',
+      reportedCurrency: report.reportedCurrency || reportedCurrency,
       totalAssets: parseInt(report.totalAssets) || 0,
       totalLiabilities: parseInt(report.totalLiabilities) || 0,
       cashAndCashEquivalents: parseInt(report.cashAndCashEquivalentsAtCarryingValue) || 0,
@@ -317,21 +333,26 @@ export const fetchBalanceSheet = async (symbol) => {
     true
   );
 
-  const quarterlyData = quarterlyReports.slice(0, 20).map(report => ({
-    date: report.fiscalDateEnding,
-    period: 'quarter',
-    totalAssets: parseInt(report.totalAssets) || 0,
-    totalLiabilities: parseInt(report.totalLiabilities) || 0,
-    cashAndCashEquivalents: parseInt(report.cashAndCashEquivalentsAtCarryingValue) || 0,
-    shortTermDebt: parseInt(report.shortTermDebt) || 0,
-    longTermDebt: parseInt(report.longTermDebtNoncurrent) || 0,
-    totalShareholderEquity: parseInt(report.totalShareholderEquity) || 0,
-    commonStockSharesOutstanding: parseFloat(report.commonStockSharesOutstanding) || 0
-  })).reverse();
+  const quarterlyData = quarterlyReports.slice(0, 20).map(report => {
+    const cashValue = parseInt(report.cashAndCashEquivalentsAtCarryingValue) || 0;
+    return {
+      date: report.fiscalDateEnding,
+      period: 'quarter',
+      reportedCurrency: report.reportedCurrency || reportedCurrency,
+      totalAssets: parseInt(report.totalAssets) || 0,
+      totalLiabilities: parseInt(report.totalLiabilities) || 0,
+      cashAndCashEquivalents: cashValue,
+      shortTermDebt: parseInt(report.shortTermDebt) || 0,
+      longTermDebt: parseInt(report.longTermDebtNoncurrent) || 0,
+      totalShareholderEquity: parseInt(report.totalShareholderEquity) || 0,
+      commonStockSharesOutstanding: parseFloat(report.commonStockSharesOutstanding) || 0
+    };
+  }).reverse();
 
   const result = {
     annual: annualData,
-    quarterly: quarterlyData
+    quarterly: quarterlyData,
+    currency: reportedCurrency
   };
 
   setCachedData(symbol, 'balance', result);
