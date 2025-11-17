@@ -52,11 +52,15 @@ const getUserInfoFromJwt = (event) => {
   if (token) {
     const decoded = decodeJwt(token);
     if (decoded) {
-      return {
-        userId: decoded.sub,
-        userName: decoded.name || decoded['https://prismfininsights.com/name'] || null,
-        userEmail: decoded.email || decoded['https://prismfininsights.com/email'] || null,
-      };
+      // Try different possible claim names for user ID
+      const userId = decoded.sub || decoded.user_id || decoded.azp || decoded.client_id;
+      if (userId) {
+        return {
+          userId: userId,
+          userName: decoded.name || decoded['https://prismfininsights.com/name'] || decoded.nickname || null,
+          userEmail: decoded.email || decoded['https://prismfininsights.com/email'] || null,
+        };
+      }
     }
   }
   
@@ -84,7 +88,6 @@ const getBody = (event) => {
 
 const handleCorsPreflight = (event) => {
   if (event.httpMethod === 'OPTIONS') {
-    console.log('[CORS] Handling OPTIONS preflight request');
     return {
       statusCode: 204,
       headers: {
@@ -107,6 +110,7 @@ const handleCorsPreflight = (event) => {
 const handleSearch = async (event) => {
   // Extract user info from JWT token
   const userInfo = getUserInfoFromJwt(event);
+  
   if (!userInfo || !userInfo.userId) {
     return errorResponse(401, 'Unauthorized request - valid JWT token required');
   }

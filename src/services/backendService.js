@@ -12,24 +12,32 @@ const defaultHeaders = () => ({
 /**
  * Log user's search (fire-and-forget)
  * @param {string} symbol - Stock ticker symbol
- * @param {Function} getAccessTokenSilently - Auth0 function to get access token
+ * @param {Function} getIdTokenClaims - Auth0 function to get ID token claims
  */
-export const logSearch = async (symbol, getAccessTokenSilently) => {
+export const logSearch = async (symbol, getIdTokenClaims) => {
   try {
-    if (!getAccessTokenSilently) {
-      console.warn('[Backend] Cannot log search: getAccessTokenSilently is required');
+    if (!getIdTokenClaims) {
+      console.warn('[Backend] Cannot log search: getIdTokenClaims is required');
       return;
     }
     
-    // Get JWT token from Auth0
-    const token = await getAccessTokenSilently({
-      authorizationParams: {
-        audience: undefined, // Use default audience
+    // Get ID token from Auth0 (contains user identity claims)
+    let token;
+    try {
+      const claims = await getIdTokenClaims();
+      if (claims && claims.__raw) {
+        token = claims.__raw; // Use raw ID token JWT
+      } else {
+        console.warn('[Backend] ID token claims missing __raw property');
+        return;
       }
-    });
+    } catch (tokenError) {
+      console.error('[Backend] Failed to get ID token:', tokenError);
+      return;
+    }
     
     if (!token) {
-      console.warn('[Backend] Cannot log search: failed to get access token');
+      console.warn('[Backend] Cannot log search: failed to get ID token');
       return;
     }
     
@@ -44,7 +52,16 @@ export const logSearch = async (symbol, getAccessTokenSilently) => {
       body: JSON.stringify({ 
         symbol
       }),
-    }).catch(err => {
+    })
+    .then(response => {
+      if (!response.ok) {
+        console.warn('[Backend] Search log failed:', response.status, response.statusText);
+        return response.text().then(text => {
+          console.warn('[Backend] Error response body:', text);
+        });
+      }
+    })
+    .catch(err => {
       console.warn('[Backend] Failed to log search:', err);
     });
   } catch (error) {
