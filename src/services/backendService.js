@@ -12,13 +12,24 @@ const defaultHeaders = () => ({
 /**
  * Log user's search (fire-and-forget)
  * @param {string} symbol - Stock ticker symbol
- * @param {string} userId - User ID (Auth0 sub)
- * @param {object} userInfo - User information (name, email)
+ * @param {Function} getAccessTokenSilently - Auth0 function to get access token
  */
-export const logSearch = async (symbol, userId, userInfo = {}) => {
+export const logSearch = async (symbol, getAccessTokenSilently) => {
   try {
-    if (!userId) {
-      console.warn('[Backend] Cannot log search: userId is required');
+    if (!getAccessTokenSilently) {
+      console.warn('[Backend] Cannot log search: getAccessTokenSilently is required');
+      return;
+    }
+    
+    // Get JWT token from Auth0
+    const token = await getAccessTokenSilently({
+      authorizationParams: {
+        audience: undefined, // Use default audience
+      }
+    });
+    
+    if (!token) {
+      console.warn('[Backend] Cannot log search: failed to get access token');
       return;
     }
     
@@ -27,13 +38,11 @@ export const logSearch = async (symbol, userId, userInfo = {}) => {
       method: 'POST',
       headers: {
         ...defaultHeaders(),
-        'X-User-Id': userId,  // Send user ID in header
+        'Authorization': `Bearer ${token}`,  // Send JWT token in Authorization header
       },
       credentials: 'include',
       body: JSON.stringify({ 
-        symbol,
-        userName: userInfo.name,
-        userEmail: userInfo.email
+        symbol
       }),
     }).catch(err => {
       console.warn('[Backend] Failed to log search:', err);

@@ -1,15 +1,75 @@
 import { errorResponse } from './utils/response.js';
 
-const getUserId = (event) => {
-  const jwtSubject = event.requestContext?.authorizer?.jwt?.claims?.sub;
-  if (jwtSubject) return jwtSubject;
+/**
+ * Extract JWT token from Authorization header
+ */
+const getJwtToken = (event) => {
+  const authHeader = event.headers?.Authorization || event.headers?.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  return authHeader.substring(7); // Remove 'Bearer ' prefix
+};
 
-  const iamUser = event.requestContext?.authorizer?.claims?.sub;
-  if (iamUser) return iamUser;
+/**
+ * Decode JWT token (without verification for now)
+ * In production, you should verify the token signature
+ */
+const decodeJwt = (token) => {
+  try {
+    // JWT format: header.payload.signature
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return null;
+    }
+    
+    // Decode payload (base64url)
+    const payload = parts[1];
+    const decoded = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8');
+    return JSON.parse(decoded);
+  } catch (error) {
+    console.warn('[Handler] Failed to decode JWT:', error.message);
+    return null;
+  }
+};
 
+/**
+ * Extract user info from JWT token
+ */
+const getUserInfoFromJwt = (event) => {
+  // Try API Gateway authorizer first (if JWT authorizer is configured)
+  const jwtClaims = event.requestContext?.authorizer?.jwt?.claims;
+  if (jwtClaims) {
+    return {
+      userId: jwtClaims.sub,
+      userName: jwtClaims.name || jwtClaims['https://prismfininsights.com/name'] || null,
+      userEmail: jwtClaims.email || jwtClaims['https://prismfininsights.com/email'] || null,
+    };
+  }
+  
+  // Fallback: Extract from Authorization header
+  const token = getJwtToken(event);
+  if (token) {
+    const decoded = decodeJwt(token);
+    if (decoded) {
+      return {
+        userId: decoded.sub,
+        userName: decoded.name || decoded['https://prismfininsights.com/name'] || null,
+        userEmail: decoded.email || decoded['https://prismfininsights.com/email'] || null,
+      };
+    }
+  }
+  
+  // Legacy: Try X-User-Id header (for backward compatibility)
   const headerUser = event.headers?.['x-user-id'] ?? event.headers?.['X-User-Id'];
-  if (headerUser) return headerUser;
-
+  if (headerUser) {
+    return {
+      userId: headerUser,
+      userName: null,
+      userEmail: null,
+    };
+  }
+  
   return null;
 };
 
@@ -30,7 +90,7 @@ const handleCorsPreflight = (event) => {
       headers: {
         'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN ?? '*',
         'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-User-Id',
+        'Access-Control-Allow-Headers': 'Content-Type,Authorization',
         'Access-Control-Allow-Credentials': 'true',
       },
       body: '',
@@ -42,25 +102,27 @@ const handleCorsPreflight = (event) => {
 /**
  * POST /stocks/search
  * Log user's search behavior to CloudWatch Logs
- * Returns 202 Accepted immediately
+ * Returns 204 No Content immediately
  */
 const handleSearch = async (event) => {
-  const userId = getUserId(event);
-  if (!userId) {
-    return errorResponse(401, 'Unauthorized request');
+  // Extract user info from JWT token
+  const userInfo = getUserInfoFromJwt(event);
+  if (!userInfo || !userInfo.userId) {
+    return errorResponse(401, 'Unauthorized request - valid JWT token required');
   }
 
-  const { symbol, userName, userEmail } = getBody(event);
+  const { symbol } = getBody(event);
   if (!symbol) {
     return errorResponse(400, 'Missing "symbol" in request body');
   }
 
   // Log to CloudWatch (structured logging for easy querying)
+  // User info is extracted from JWT token, not from request body
   console.log(JSON.stringify({
     event: 'stock_search',
-    userId,
-    userName: userName || 'N/A',
-    userEmail: userEmail || 'N/A',
+    userId: userInfo.userId,
+    userName: userInfo.userName || 'N/A',
+    userEmail: userInfo.userEmail || 'N/A',
     symbol: symbol.toUpperCase(),
     timestamp: new Date().toISOString(),
     requestId: event.requestContext?.requestId,

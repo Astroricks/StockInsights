@@ -35,7 +35,7 @@ import { logSearch } from './services/backendService';
 import './App.css';
 
 function App() {
-  const { isAuthenticated, isLoading: authLoading, loginWithRedirect, user } = useAuth0();
+  const { isAuthenticated, isLoading: authLoading, loginWithRedirect, user, getAccessTokenSilently } = useAuth0();
   const [financialData, setFinancialData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -135,11 +135,8 @@ function App() {
       }
 
       // Fire-and-forget: log search to backend (only for authenticated users and non-cached data)
-      if (isAuthenticated && user && !isCached) {
-        logSearch(normalizedTicker, user.sub, {
-          name: user.name,
-          email: user.email
-        });
+      if (isAuthenticated && getAccessTokenSilently && !isCached) {
+        logSearch(normalizedTicker, getAccessTokenSilently);
       }
 
       // Fetch data from Alpha Vantage (will use cache if available)
