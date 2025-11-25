@@ -19,6 +19,8 @@ import CompanyOverview from './components/CompanyOverview';
 import ErrorMessage from './components/ErrorMessage';
 import StockButton from './components/StockButton';
 import SettingsModal from './components/SettingsModal';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import TermsOfService from './components/TermsOfService';
 
 // Import services
 import { 
@@ -45,6 +47,8 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
   const [cachedStocks, setCachedStocks] = useState([]);
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
+  const [showTermsOfService, setShowTermsOfService] = useState(false);
 
   // Check for API key on mount and auth change
   useEffect(() => {
@@ -548,16 +552,57 @@ function App() {
       {/* Footer */}
       <footer className="border-t border-border bg-card mt-12">
         <div className="container mx-auto px-4 py-6">
-          <div className="text-center text-sm text-muted-foreground space-y-2">
-            <p>
-              Powered by <a href="https://www.alphavantage.co" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Alpha Vantage API</a>
-            </p>
-            <p>
-              Questions or feedback? Email us at{' '}
-              <a href="mailto:prismfininsights@gmail.com" className="text-primary hover:underline">
-                prismfininsights@gmail.com
+          <div className="text-center text-sm text-muted-foreground space-y-4">
+            {/* Legal Links */}
+            <div className="flex flex-wrap justify-center gap-4 items-center">
+              <button
+                onClick={() => setShowPrivacyPolicy(true)}
+                className="text-primary hover:underline"
+              >
+                Privacy Policy
+              </button>
+              <span className="text-muted-foreground">•</span>
+              <button
+                onClick={() => setShowTermsOfService(true)}
+                className="text-primary hover:underline"
+              >
+                Terms of Service
+              </button>
+              <span className="text-muted-foreground">•</span>
+              <a
+                href="mailto:prismfininsights@gmail.com"
+                className="text-primary hover:underline"
+              >
+                Contact Us
               </a>
-            </p>
+            </div>
+
+            {/* About Us */}
+            <div>
+              <p className="font-semibold text-foreground mb-1">About PrismFin Insights</p>
+              <p className="max-w-2xl mx-auto">
+                PrismFin Insights provides comprehensive financial data visualization and analysis 
+                for publicly traded stocks. We help investors make informed decisions by presenting 
+                key financial metrics in an easy-to-understand format.
+              </p>
+            </div>
+
+            {/* Contact Info */}
+            <div>
+              <p>
+                Questions or feedback? Email us at{' '}
+                <a href="mailto:prismfininsights@gmail.com" className="text-primary hover:underline">
+                  prismfininsights@gmail.com
+                </a>
+              </p>
+            </div>
+
+            {/* Attribution */}
+            <div className="pt-2 border-t border-border">
+              <p>
+                Powered by <a href="https://www.alphavantage.co" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Alpha Vantage API</a>
+              </p>
+            </div>
           </div>
         </div>
       </footer>
@@ -568,6 +613,18 @@ function App() {
         onClose={() => setShowSettings(false)}
         onApiKeyUpdate={handleApiKeyUpdate}
         userId={user?.sub}
+      />
+
+      {/* Privacy Policy Modal */}
+      <PrivacyPolicy 
+        isOpen={showPrivacyPolicy}
+        onClose={() => setShowPrivacyPolicy(false)}
+      />
+
+      {/* Terms of Service Modal */}
+      <TermsOfService 
+        isOpen={showTermsOfService}
+        onClose={() => setShowTermsOfService(false)}
       />
     </div>
   );
