@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
+import { Routes, Route, useLocation, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import SignInButton from './components/SignInButton';
 import { Input } from '@/components/ui/input';
@@ -21,6 +22,8 @@ import StockButton from './components/StockButton';
 import SettingsModal from './components/SettingsModal';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import TermsOfService from './components/TermsOfService';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
 
 // Import services
 import { 
@@ -36,8 +39,9 @@ import {
 import { logSearch } from './services/backendService';
 import './App.css';
 
-function App() {
+function HomePage() {
   const { isAuthenticated, isLoading: authLoading, loginWithRedirect, user, getIdTokenClaims } = useAuth0();
+  const navigate = useNavigate();
   const [financialData, setFinancialData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -179,6 +183,7 @@ function App() {
   };
 
   const handleGoHome = () => {
+    navigate('/');
     setFinancialData(null);
     setCurrentTicker('');
     setSearchTicker('');
@@ -555,19 +560,19 @@ function App() {
           <div className="text-center text-sm text-muted-foreground space-y-4">
             {/* Legal Links */}
             <div className="flex flex-wrap justify-center gap-4 items-center">
-              <button
-                onClick={() => setShowPrivacyPolicy(true)}
+              <Link
+                to="/privacy"
                 className="text-primary hover:underline"
               >
                 Privacy Policy
-              </button>
+              </Link>
               <span className="text-muted-foreground">•</span>
-              <button
-                onClick={() => setShowTermsOfService(true)}
+              <Link
+                to="/terms"
                 className="text-primary hover:underline"
               >
                 Terms of Service
-              </button>
+              </Link>
               <span className="text-muted-foreground">•</span>
               <a
                 href="mailto:prismfininsights@gmail.com"
@@ -615,18 +620,28 @@ function App() {
         userId={user?.sub}
       />
 
-      {/* Privacy Policy Modal */}
+      {/* Privacy Policy Modal (kept for backwards compatibility) */}
       <PrivacyPolicy 
         isOpen={showPrivacyPolicy}
         onClose={() => setShowPrivacyPolicy(false)}
       />
 
-      {/* Terms of Service Modal */}
+      {/* Terms of Service Modal (kept for backwards compatibility) */}
       <TermsOfService 
         isOpen={showTermsOfService}
         onClose={() => setShowTermsOfService(false)}
       />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/privacy" element={<PrivacyPolicyPage />} />
+      <Route path="/terms" element={<TermsOfServicePage />} />
+    </Routes>
   );
 }
 
