@@ -4,7 +4,7 @@ import { Routes, Route, useLocation, Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button';
 import SignInButton from './components/SignInButton';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2, TrendingUp, Settings, Info } from 'lucide-react';
+import { Search, Loader2, Settings, Info } from 'lucide-react';
 
 // Import chart components
 import PriceChart from './components/PriceChart';
@@ -228,7 +228,11 @@ function HomePage() {
                 }
               }}
             >
-              <TrendingUp className="h-8 w-8 text-primary" />
+              <img 
+                src="/prismfininsights_logo.png" 
+                alt="PrismFin Insights Logo" 
+                className="h-8 w-8 object-contain"
+              />
               <div>
                 <h1 className="text-2xl font-bold text-foreground">
                   PrismFin Insights - {currentTicker || 'Stock Research'}
@@ -508,7 +512,11 @@ function HomePage() {
         {/* Welcome State */}
         {!financialData && !loading && !error && (
           <div className="text-center py-12">
-            <TrendingUp className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <img 
+              src="/prismfininsights_logo.png" 
+              alt="PrismFin Insights Logo" 
+              className="h-16 w-16 mx-auto mb-4 object-contain"
+            />
             <h2 className="text-2xl font-semibold text-foreground mb-2">
               Welcome to PrismFin Insights
             </h2>
