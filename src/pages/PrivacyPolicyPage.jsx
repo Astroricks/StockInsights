@@ -52,7 +52,7 @@ const PrivacyPolicyPage = () => {
               </p>
               <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
                 <li>Provide stock analysis and financial insights</li>
-                <li>Log search queries for service improvement (stored in AWS CloudWatch Logs)</li>
+                <li>Log search queries for service improvement (stored in AWS)</li>
                 <li>Authenticate your account and provide personalized features</li>
               </ul>
             </section>
@@ -68,7 +68,7 @@ const PrivacyPolicyPage = () => {
               </p>
               <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
                 <li>Auth0 (for authentication services)</li>
-                <li>AWS CloudWatch (for logging search queries)</li>
+                <li>AWS (for logging search queries)</li>
               </ul>
             </section>
 
@@ -80,7 +80,7 @@ const PrivacyPolicyPage = () => {
               <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
                 <li><strong>Auth0:</strong> Handles user authentication. See their privacy policy at <a href="https://auth0.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">auth0.com/privacy</a></li>
                 <li><strong>Alpha Vantage:</strong> Provides financial data. Your API key is used directly from your browser to call their API.</li>
-                <li><strong>AWS CloudWatch:</strong> Stores search logs for analytics purposes.</li>
+                <li><strong>AWS:</strong> Stores search logs for analytics purposes.</li>
               </ul>
             </section>
 
