@@ -20,7 +20,7 @@ const TermsOfServicePage = () => {
         <div className="bg-card border border-border rounded-lg p-8">
           <h1 className="text-3xl font-bold mb-2">Terms of Service</h1>
           <p className="text-muted-foreground mb-8">
-            <strong>Last Updated:</strong> {new Date().toLocaleDateString()}
+            <strong>Last Updated:</strong> 11/26/2025
           </p>
 
           <div className="space-y-6 text-sm">

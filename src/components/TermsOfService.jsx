@@ -9,7 +9,7 @@ const TermsOfService = ({ isOpen, onClose }) => {
         </DialogHeader>
         <div className="space-y-4 text-sm">
           <p className="text-muted-foreground">
-            <strong>Last Updated:</strong> {new Date().toLocaleDateString()}
+            <strong>Last Updated:</strong> 11/26/2025
           </p>
 
           <section>
