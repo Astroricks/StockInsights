@@ -3,6 +3,7 @@ import axios from 'axios';
 const ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query';
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 const API_KEY_STORAGE_PREFIX = 'alpha_vantage_api_key';
+const API_CALL_DELAY = 250; // Delay between API calls in milliseconds (to avoid rate limiting)
 
 let API_KEY = null;
 let CURRENT_USER_ID = null;
@@ -116,7 +117,13 @@ const setCachedData = (symbol, endpoint, data) => {
   }
 };
 
-// API call wrapper
+// Rate limiting: track last API call time
+let lastApiCallTime = 0;
+
+// Helper to delay API calls to avoid rate limiting
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// API call wrapper with rate limiting
 const callAlphaVantage = async (params) => {
   // Try to load API key from localStorage if not already set
   if (!API_KEY) {
@@ -130,6 +137,15 @@ const callAlphaVantage = async (params) => {
   if (!API_KEY) {
     throw new Error('API key not configured. Please set your Alpha Vantage API key.');
   }
+
+  // Rate limiting: ensure minimum delay between API calls
+  const now = Date.now();
+  const timeSinceLastCall = now - lastApiCallTime;
+  if (timeSinceLastCall < API_CALL_DELAY) {
+    const waitTime = API_CALL_DELAY - timeSinceLastCall;
+    await delay(waitTime);
+  }
+  lastApiCallTime = Date.now();
 
   const response = await axios.get(ALPHA_VANTAGE_BASE_URL, {
     params: {
@@ -606,25 +622,19 @@ export const fetchAllFinancialData = async (symbol) => {
     // Fetch historical data first (needed for dividend extraction)
     const historicalData = await fetchHistoricalData(symbol);
     
-    // Fetch all other data in parallel, and extract dividends from historical data
-    const [
-      incomeStatement,
-      cashFlowStatement,
-      balanceSheet,
-      companyProfile,
-      earningsData,
-      dividendsData
-    ] = await Promise.all([
-      fetchIncomeStatement(symbol),
-      fetchCashFlowStatement(symbol),
-      fetchBalanceSheet(symbol),
-      fetchCompanyOverview(symbol),
-      fetchEarningsData(symbol),
-      fetchDividendHistory(symbol, historicalData).catch(err => {
-        console.warn(`Dividend extraction failed for ${symbol}:`, err.message);
-        return { annual: [], quarterly: [] };
-      })
-    ]);
+    // Fetch all other data sequentially with delays to avoid rate limiting
+    // The delay in callAlphaVantage will space out the calls automatically
+    const incomeStatement = await fetchIncomeStatement(symbol);
+    const cashFlowStatement = await fetchCashFlowStatement(symbol);
+    const balanceSheet = await fetchBalanceSheet(symbol);
+    const companyProfile = await fetchCompanyOverview(symbol);
+    const earningsData = await fetchEarningsData(symbol);
+    
+    // Dividends are extracted from historical data, so no API call needed
+    const dividendsData = await fetchDividendHistory(symbol, historicalData).catch(err => {
+      console.warn(`Dividend extraction failed for ${symbol}:`, err.message);
+      return { annual: [], quarterly: [] };
+    });
 
     return {
       symbol: symbol.toUpperCase(),
