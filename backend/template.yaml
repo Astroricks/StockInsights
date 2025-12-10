@@ -43,6 +43,8 @@ Resources:
       Environment:
         Variables:
           ALLOWED_ORIGIN: !Ref AllowedOrigin
+          AUTH0_DOMAIN: dev-qq0v6g1jo31z8gcr.us.auth0.com
+          AUTH0_CLIENT_ID: TT9guu2A2W8zgIZZKAgFZc0TB9JHekst
 
 Outputs:
   ApiUrl:

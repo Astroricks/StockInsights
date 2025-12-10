@@ -1,4 +1,5 @@
 import { errorResponse } from './utils/response.js';
+import { verifyJwt, decodeJwtUnverified } from './utils/jwtVerifier.js';
 
 /**
  * Extract JWT token from Authorization header
@@ -12,31 +13,9 @@ const getJwtToken = (event) => {
 };
 
 /**
- * Decode JWT token (without verification for now)
- * In production, you should verify the token signature
+ * Extract user info from JWT token (with signature verification)
  */
-const decodeJwt = (token) => {
-  try {
-    // JWT format: header.payload.signature
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      return null;
-    }
-    
-    // Decode payload (base64url)
-    const payload = parts[1];
-    const decoded = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8');
-    return JSON.parse(decoded);
-  } catch (error) {
-    console.warn('[Handler] Failed to decode JWT:', error.message);
-    return null;
-  }
-};
-
-/**
- * Extract user info from JWT token
- */
-const getUserInfoFromJwt = (event) => {
+const getUserInfoFromJwt = async (event) => {
   // Try API Gateway authorizer first (if JWT authorizer is configured)
   const jwtClaims = event.requestContext?.authorizer?.jwt?.claims;
   if (jwtClaims) {
@@ -47,19 +26,36 @@ const getUserInfoFromJwt = (event) => {
     };
   }
   
-  // Fallback: Extract from Authorization header
+  // Extract and verify token from Authorization header
   const token = getJwtToken(event);
   if (token) {
-    const decoded = decodeJwt(token);
+    // Verify JWT signature using Auth0's public keys
+    const decoded = await verifyJwt(token);
     if (decoded) {
-      // Try different possible claim names for user ID
-      const userId = decoded.sub || decoded.user_id || decoded.azp || decoded.client_id;
+      // Extract user info from verified token
+      const userId = decoded.sub;
       if (userId) {
         return {
           userId: userId,
           userName: decoded.name || decoded['https://prismfininsights.com/name'] || decoded.nickname || null,
           userEmail: decoded.email || decoded['https://prismfininsights.com/email'] || null,
         };
+      }
+    } else {
+      // If verification fails, try unverified decode for debugging (remove in production)
+      if (process.env.NODE_ENV !== 'production') {
+        const unverified = decodeJwtUnverified(token);
+        if (unverified) {
+          console.warn('[Handler] Using unverified token (development only)');
+          const userId = unverified.sub;
+          if (userId) {
+            return {
+              userId: userId,
+              userName: unverified.name || unverified['https://prismfininsights.com/name'] || unverified.nickname || null,
+              userEmail: unverified.email || unverified['https://prismfininsights.com/email'] || null,
+            };
+          }
+        }
       }
     }
   }
@@ -108,8 +104,8 @@ const handleCorsPreflight = (event) => {
  * Returns 204 No Content immediately
  */
 const handleSearch = async (event) => {
-  // Extract user info from JWT token
-  const userInfo = getUserInfoFromJwt(event);
+  // Extract user info from JWT token (with signature verification)
+  const userInfo = await getUserInfoFromJwt(event);
   
   if (!userInfo || !userInfo.userId) {
     return errorResponse(401, 'Unauthorized request - valid JWT token required');
