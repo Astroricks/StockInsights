@@ -3,7 +3,7 @@ import axios from 'axios';
 const ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query';
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 const API_KEY_STORAGE_PREFIX = 'alpha_vantage_api_key';
-const API_CALL_DELAY = 1000; // Delay between API calls in milliseconds (to avoid rate limiting)
+const API_CALL_DELAY = 2000; // Delay between API calls in milliseconds (to avoid rate limiting)
 
 let API_KEY = null;
 let CURRENT_USER_ID = null;
